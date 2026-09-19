@@ -1,0 +1,1 @@
+{"name":"clipforge-captions","private":true,"version":"0.0.0","type":"module","dependencies":{"@remotion/cli":"^4.0.526","@remotion/player":"^4.0.526","@remotion/renderer":"^4.0.526","react":"^19.3.0","react-dom":"^19.3.0","remotion":"^4.0.526"},"devDependencies":{"@types/react":"^19.3.0","typescript":"^7.0.2"}}

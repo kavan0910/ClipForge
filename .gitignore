@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.env
+node_modules/
+web/dist/
+captions/out/
+eval/fixtures/media/
+*.partial
+.DS_Store
