@@ -44,3 +44,14 @@ def test_disk_check_handles_nonexistent_data_dir(tmp_path):
     r = Report()
     check_disk(r, Settings(DATA_DIR=tmp_path / "does" / "not" / "exist"))
     assert r.checks[0].name == "disk"
+
+
+def test_empty_env_values_are_unset_and_comments_never_leak(tmp_path, monkeypatch):
+    env = tmp_path / ".env"
+    env.write_text("YTDLP_COOKIES_FROM_BROWSER=\nHF_TOKEN=\nASR_MODEL=large-v3\n")
+    monkeypatch.chdir(tmp_path)
+    for k in ("YTDLP_COOKIES_FROM_BROWSER", "HF_TOKEN", "ASR_MODEL"):
+        monkeypatch.delenv(k, raising=False)
+    s = Settings()
+    assert s.ytdlp_cookies_from_browser is None and s.hf_token is None
+    assert s.asr_model == "large-v3"

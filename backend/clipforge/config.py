@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", env_ignore_empty=True)
 
     anthropic_api_key: SecretStr | None = Field(default=None, alias="ANTHROPIC_API_KEY")
     scan_model: str = Field(default="claude-haiku-4-5-20251001", alias="CLIPFORGE_SCAN_MODEL")
@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     asr_backend: Literal["auto", "faster-whisper", "mlx-whisper"] = Field(
         default="auto", alias="ASR_BACKEND"
     )
-    asr_model: str = Field(default="large-v3", alias="ASR_MODEL")
+    asr_model: str = Field(default="large-v3-turbo", alias="ASR_MODEL")
     max_source_height: int = Field(default=1080, alias="MAX_SOURCE_HEIGHT", ge=360, le=2160)
     ytdlp_cookies_from_browser: str | None = Field(default=None, alias="YTDLP_COOKIES_FROM_BROWSER")
     data_dir: Path = Field(default=Path("~/Clipforge"), alias="DATA_DIR")

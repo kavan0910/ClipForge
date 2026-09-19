@@ -1,4 +1,4 @@
-.PHONY: setup dev start test lint fmt update-ytdlp doctor fixtures ffmpeg-full
+.PHONY: setup dev start test slow e2e lint fmt update-ytdlp doctor fixtures bench-asr ffmpeg-full
 
 setup:
 	@command -v uv >/dev/null || brew install uv
@@ -10,8 +10,9 @@ setup:
 	@test -f .env || cp .env.example .env
 
 dev:
-	uv run uvicorn clipforge.api.app:app --app-dir backend --reload --host 127.0.0.1 --port 8765 & \
-	cd web && npm run dev
+	CLIPFORGE_TOKEN=dev-token uv run uvicorn clipforge.api.app:app --app-dir backend --reload \
+		--host 127.0.0.1 --port 8765 & \
+	cd web && VITE_CLIPFORGE_TOKEN=dev-token npm run dev
 
 start:
 	uv run uvicorn clipforge.api.app:app --app-dir backend --host 127.0.0.1 --port 8765
@@ -19,6 +20,15 @@ start:
 test:
 	uv run pytest -q
 	cd web && npm test --silent
+
+slow:
+	uv run pytest -q -m slow
+
+e2e:
+	cd web && npx playwright install chromium && npx playwright test
+
+bench-asr:
+	uv run python scripts/bench_asr.py 180
 
 lint:
 	uv run ruff check backend scripts
