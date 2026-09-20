@@ -198,6 +198,10 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
         pid = secrets.token_hex(4)
         project = Project.create(projects_dir, pid)
         title = spec.url or spec.path or "Uploaded file"
+        if spec.type == "upload" and spec.upload_id:
+            title = (await run_in_threadpool(uploads.status, spec.upload_id)).filename
+        elif spec.type == "path" and spec.path:
+            title = Path(spec.path).name  # not the whole path
         project.path("project.json").write_text(json.dumps({"id": pid, "title": title}))
         job = {"source": spec.model_dump(exclude_none=True), "options": req.options.model_dump()}
         await run_in_threadpool(jobs.start, project, job)
@@ -209,6 +213,13 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
         for d in sorted(projects_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
             if (d / "project.json").exists():
                 meta = json.loads((d / "project.json").read_text())
+                src = d / "source" / "source.json"
+                if (
+                    src.exists()
+                ):  # the real title (video title or file name) wins once the source is known
+                    real = json.loads(src.read_text()).get("title")
+                    if real:
+                        meta["title"] = real
                 out.append({**meta, "status": jobs.status(Project(d))})
         return out
 

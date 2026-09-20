@@ -169,3 +169,22 @@ def test_render_endpoints_report_status_and_cancel_cleanly(env):
     project.emit("render_error", clip="c001", code="media", message="boom", action="retry")
     rows = client.get("/api/renders").json()
     assert rows and rows[0]["state"] == "error" and rows[0]["error"]["message"] == "boom"
+
+
+def test_project_list_shows_the_real_title(tmp_path):
+    import json
+
+    from fastapi.testclient import TestClient
+
+    from clipforge.api.app import create_app
+    from clipforge.config import Settings
+
+    settings = Settings(DATA_DIR=str(tmp_path))  # pyright: ignore[reportCallIssue]
+    app = create_app(settings, token="t")
+    d = tmp_path / "projects" / "abc12345"
+    (d / "source").mkdir(parents=True)
+    (d / "logs").mkdir()
+    (d / "project.json").write_text(json.dumps({"id": "abc12345", "title": "Uploaded file"}))
+    (d / "source" / "source.json").write_text(json.dumps({"title": "My Interview"}))
+    rows = TestClient(app).get("/api/projects", headers={"x-clipforge-token": "t"}).json()
+    assert rows[0]["title"] == "My Interview"
