@@ -166,3 +166,32 @@ def test_audiogram_levels_follow_the_audio():
     )
     assert frame.shape == (1920, 1080, 3) and frame.dtype == np.uint8
     assert UPLOAD_URL.startswith("https://www.googleapis.com/upload/youtube/v3")
+
+
+def test_panns_files_download_without_wget(tmp_path: Path):
+    from clipforge.errors import MediaError
+    from clipforge.signals import audio
+
+    calls: list[str] = []
+
+    def fake(url: str, dest: Path) -> None:
+        calls.append(dest.name)
+        dest.write_bytes(b"x" * (400_000_000 if dest.name.endswith(".pth.part") else 20_000))
+
+    audio.ensure_panns_files(tmp_path, fake)
+    assert {p.name for p in tmp_path.iterdir()} == set(audio.PANNS_FILES)
+    audio.ensure_panns_files(tmp_path, fake)  # complete files are not fetched again
+    assert len(calls) == 2
+    (tmp_path / "class_labels_indices.csv").write_bytes(
+        b""
+    )  # a wget leftover of 0 bytes is replaced
+    audio.ensure_panns_files(tmp_path, fake)
+    assert len(calls) == 3
+
+    def short(url: str, dest: Path) -> None:
+        dest.write_bytes(b"x")
+
+    (tmp_path / "class_labels_indices.csv").unlink()
+    with pytest.raises(MediaError):
+        audio.ensure_panns_files(tmp_path, short)
+    assert not list(tmp_path.glob("*.part"))

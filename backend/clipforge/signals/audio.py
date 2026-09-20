@@ -9,6 +9,7 @@ from pathlib import Path
 
 import numpy as np
 
+from clipforge.errors import MediaError
 from clipforge.models import Word
 from clipforge.procs import Cancelled, CancelToken
 
@@ -52,6 +53,47 @@ def speech_rate_and_density(
     return smoothed.tolist(), np.clip(voiced, 0, 1).tolist()
 
 
+PANNS_DIR = Path.home() / "panns_data"
+PANNS_FILES = {  # name -> (url, minimum plausible size in bytes)
+    "class_labels_indices.csv": ("https://storage.googleapis.com/us_audioset/youtube_corpus/v1/csv/class_labels_indices.csv", 10_000),
+    "Cnn14_DecisionLevelMax.pth": ("https://zenodo.org/record/3987831/files/Cnn14_DecisionLevelMax_mAP%3D0.385.pth?download=1", 300_000_000),
+}  # fmt: skip
+
+
+def ensure_panns_files(
+    directory: Path | None = None, fetch: Callable[[str, Path], None] | None = None
+) -> None:
+    """Download the PANNs label list and checkpoint with Python (atomic, size-checked), replacing the library's wget calls."""
+    directory = directory or PANNS_DIR
+    directory.mkdir(parents=True, exist_ok=True)
+    for name, (url, min_size) in PANNS_FILES.items():
+        dest = directory / name
+        if dest.exists() and dest.stat().st_size >= min_size:
+            continue
+        part = dest.with_suffix(dest.suffix + ".part")
+        try:
+            (fetch or _download)(url, part)
+            if part.stat().st_size < min_size:
+                raise OSError(f"{name} downloaded incompletely ({part.stat().st_size} bytes)")
+            part.replace(dest)
+        except OSError as e:
+            part.unlink(missing_ok=True)
+            raise MediaError(
+                f"Could not download the sound-event model file {name}.",
+                f"Check your internet connection and retry. ({e})",
+            ) from e
+
+
+def _download(url: str, dest: Path) -> None:
+    import httpx
+
+    with httpx.stream("GET", url, follow_redirects=True, timeout=httpx.Timeout(30, read=120)) as r:
+        r.raise_for_status()
+        with dest.open("wb") as f:
+            for chunk in r.iter_bytes(1 << 20):
+                f.write(chunk)
+
+
 def event_probabilities(
     media_path: Path,
     audio_stream: int,
@@ -60,6 +102,7 @@ def event_probabilities(
     on_progress: Callable[[float], None] | None = None,
 ) -> tuple[list[float], list[float]]:
     """Per-second laughter and applause probability with PANNs, streamed from the master."""
+    ensure_panns_files()  # before the import: the library itself shells out to `wget`, which a fresh Mac lacks
     from panns_inference import SoundEventDetection, labels
 
     idx = {n: i for i, n in enumerate(labels)}

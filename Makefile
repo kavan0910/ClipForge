@@ -4,7 +4,8 @@ setup:
 	@command -v uv >/dev/null || brew install uv
 	@command -v deno >/dev/null || brew install deno
 	@ffmpeg -hide_banner -filters 2>/dev/null | grep -q zscale || (brew uninstall --ignore-dependencies ffmpeg 2>/dev/null; brew install ffmpeg-full)
-	uv sync
+	uv sync --extra diarization
+	uv run python -c "from clipforge.signals.audio import ensure_panns_files; ensure_panns_files()"
 	cd web && npm install
 	cd captions && npm install && npx remotion browser ensure
 	uv run python scripts/fetch_fonts.py
