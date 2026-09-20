@@ -40,11 +40,16 @@ def loose_schema(model: type[BaseModel]) -> dict[str, Any]:
     schema = model.model_json_schema()
     defs = schema.get("$defs", {})
 
-    def walk(node: Any) -> Any:
+    def walk(node: Any, in_properties: bool = False) -> Any:
         if isinstance(node, dict):
             if "$ref" in node:
                 return walk(defs[node["$ref"].split("/")[-1]])
-            out = {k: walk(v) for k, v in node.items() if k not in _STRIP and k != "$defs"}
+            # Inside a `properties` mapping the keys are field NAMES (a field called "title" must survive).
+            out = {
+                k: walk(v, k == "properties")
+                for k, v in node.items()
+                if in_properties or (k not in _STRIP and k != "$defs")
+            }
             if out.get("type") == "object" and "properties" in out:
                 out["additionalProperties"] = False
                 out["required"] = list(out["properties"])
@@ -103,6 +108,10 @@ class LLMClient:
         }  # fmt: skip
         if mode == "json":
             req["output_config"] = {"format": {"type": "json_schema", "schema": schema}}
+            if not model.startswith("claude-haiku"):
+                req["thinking"] = {
+                    "type": "disabled"
+                }  # adaptive thinking is on by default: extra cost, no gain here
         else:
             req["tools"] = [
                 {"name": tool_name, "description": "Return the result.", "input_schema": schema}

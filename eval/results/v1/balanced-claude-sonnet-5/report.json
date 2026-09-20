@@ -1,0 +1,108 @@
+{
+  "suite": "core",
+  "prompt_version": "v1",
+  "preset": "balanced",
+  "models": {
+    "scan": "claude-haiku-4-5-20251001",
+    "curate": "claude-sonnet-5"
+  },
+  "date": "2026-09-20",
+  "aggregate": {
+    "videos": 6,
+    "recall_at_3": 0.3738,
+    "recall_at_5": 0.3738,
+    "precision_at_5": 0.5833,
+    "starts_on_sentence": 1.0,
+    "mid_word_cuts": 0,
+    "hard_reject_pass": 1.0,
+    "bad_hit_rate": 0.0,
+    "hook_supported": 0.5278,
+    "usd": 0.288
+  },
+  "videos": [
+    {
+      "video": "kende_internet_hall_of_fame",
+      "genre": "interview",
+      "n_clips": 2,
+      "recall_at_3": 0.5,
+      "recall_at_5": 0.5,
+      "precision_at_5": 1.0,
+      "starts_on_sentence": 1.0,
+      "mid_word_cuts": 0,
+      "hard_reject_pass": 1.0,
+      "bad_hit_rate": 0.0,
+      "hook_supported": 1.0,
+      "usd": 0.017885
+    },
+    {
+      "video": "hannah_cloke_extreme_weather",
+      "genre": "interview",
+      "n_clips": 4,
+      "recall_at_3": 0.6,
+      "recall_at_5": 0.6,
+      "precision_at_5": 0.75,
+      "starts_on_sentence": 1.0,
+      "mid_word_cuts": 0,
+      "hard_reject_pass": 1.0,
+      "bad_hit_rate": 0.0,
+      "hook_supported": 0.5,
+      "usd": 0.040907
+    },
+    {
+      "video": "udio_tutorial",
+      "genre": "tutorial",
+      "n_clips": 2,
+      "recall_at_3": 0.0,
+      "recall_at_5": 0.0,
+      "precision_at_5": 0.0,
+      "starts_on_sentence": 1.0,
+      "mid_word_cuts": 0,
+      "hard_reject_pass": 1.0,
+      "bad_hit_rate": 0.0,
+      "hook_supported": 0.5,
+      "usd": 0.037764
+    },
+    {
+      "video": "fbi_podcast_fugitive",
+      "genre": "podcast",
+      "n_clips": 4,
+      "recall_at_3": 0.6,
+      "recall_at_5": 0.6,
+      "precision_at_5": 0.75,
+      "starts_on_sentence": 1.0,
+      "mid_word_cuts": 0,
+      "hard_reject_pass": 1.0,
+      "bad_hit_rate": 0.0,
+      "hook_supported": 0.5,
+      "usd": 0.037764
+    },
+    {
+      "video": "direct_current_rooftop_solar",
+      "genre": "podcast",
+      "n_clips": 3,
+      "recall_at_3": 0.14285714285714285,
+      "recall_at_5": 0.14285714285714285,
+      "precision_at_5": 0.3333333333333333,
+      "starts_on_sentence": 1.0,
+      "mid_word_cuts": 0,
+      "hard_reject_pass": 1.0,
+      "bad_hit_rate": 0.0,
+      "hook_supported": 0.6666666666666666,
+      "usd": 0.066607
+    },
+    {
+      "video": "flynn_right_to_research",
+      "genre": "lecture",
+      "n_clips": 3,
+      "recall_at_3": 0.4,
+      "recall_at_5": 0.4,
+      "precision_at_5": 0.6666666666666666,
+      "starts_on_sentence": 1.0,
+      "mid_word_cuts": 0,
+      "hard_reject_pass": 1.0,
+      "bad_hit_rate": 0.0,
+      "hook_supported": 0.0,
+      "usd": 0.087064
+    }
+  ]
+}

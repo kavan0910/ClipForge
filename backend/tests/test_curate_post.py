@@ -194,6 +194,13 @@ def test_hook_truthfulness_flags_invented_claims():
     bad = hook_check("Revenue tripled in ninety days", evidence)
     assert not bad.passed and "tripled" in bad.missing
     assert hook_check("Wow", evidence).passed  # no checkable content words
+    # Stems and apostrophes: killed/killing, violent/violence, "won't"/wont.
+    ev2 = "Gangs kept killing people with extreme violence, and scientists won't say it."
+    assert hook_check("Killed by violent gangs: scientists won't say", ev2).passed
+    assert not hook_check(
+        "Researchers studying vaccine hesitancy got their paper deleted",
+        "We copy the whole internet.",
+    ).passed
 
 
 def test_format_and_chunking():

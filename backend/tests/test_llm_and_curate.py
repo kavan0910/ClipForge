@@ -50,6 +50,10 @@ def test_loose_schema_is_closed_and_has_no_local_constraints():
     dumped = json.dumps(s)
     assert "maxLength" not in dumped and "minimum" not in dumped and "$ref" not in dumped
     clip = s["properties"]["clips"]["items"]
+    assert (
+        "title" in clip["properties"] and "title" in clip["required"]
+    )  # a FIELD named title survives
+    assert "title" not in clip["properties"]["title"]  # the keyword is still stripped
     assert clip["additionalProperties"] is False and "scores" in clip["required"]
 
 

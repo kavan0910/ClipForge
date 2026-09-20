@@ -106,23 +106,34 @@ def overlap_fraction(a: tuple[float, float], b: tuple[float, float]) -> float:
 
 
 _STOP = {
-    "about", "after", "again", "being", "could", "every", "first", "their", "there", "these",
-    "thing", "think", "those", "under", "until", "which", "while", "would", "where", "other",
-    "really", "because", "before",
+    "about", "after", "again", "being", "could", "every", "first", "their", "there", "these", "thing",
+    "think", "those", "under", "until", "which", "while", "would", "where", "other", "really", "because",
+    "before", "actually", "never", "ever", "guess", "watch", "entire", "already", "still", "just",
 }  # fmt: skip
+# Words that signal attention-grabbing framing rather than a factual claim.
+
+
+def _stem(w: str) -> str:
+    """Crude prefix stem so 'killed'/'killing'/'killer' and 'violent'/'violence' compare equal."""
+    return w[:5] if len(w) > 5 else w
 
 
 def hook_check(hook: str, evidence_text: str, min_coverage: float = 0.6) -> HookCheck:
-    """Truthfulness check: the hook's numbers and content words must occur in its evidence range."""
-    ev = re.sub(r"[^\w\s]", " ", evidence_text.lower())
+    """Truthfulness check: the hook's numbers and content words must occur in its evidence range.
+
+    Deliberately conservative and stem-aware; a failure means "the editor should look", not "false".
+    """
+    ev_words = {
+        _stem(t) for t in re.findall(r"[a-z0-9]+", re.sub(r"['\u2019]", "", evidence_text.lower()))
+    }
+    ev_words |= {t for t in re.findall(r"[a-z0-9]+", evidence_text.lower())}
     terms = [
-        t
-        for t in re.findall(r"[a-z0-9']+", hook.lower())
+        t for t in re.findall(r"[a-z0-9]+", re.sub(r"['\u2019]", "", hook.lower()))
         if t.isdigit() or (len(t) >= 5 and t not in _STOP)
-    ]
+    ]  # fmt: skip
     if not terms:
         return HookCheck(passed=True, coverage=1.0, missing=[])
-    missing = [t for t in terms if t.rstrip("s") not in ev]
+    missing = [t for t in terms if _stem(t) not in ev_words and t not in ev_words]
     cov = 1 - len(missing) / len(terms)
     return HookCheck(passed=cov >= min_coverage, coverage=round(cov, 3), missing=missing)
 

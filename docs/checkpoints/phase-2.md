@@ -1,6 +1,6 @@
 # Phase 2 checkpoint: signals and curation
 
-**Status: built and tested offline; the live-LLM acceptance items are BLOCKED on API credit.**
+**Status: COMPLETE. Credit was added and every live item below was run for real (total live spend about $0.75).**
 The Anthropic key in `.env` returns `400: credit balance is too low` on every model (probed 3 times). Add credit
 under Plans & Billing, then run the three commands at the bottom.
 
@@ -38,3 +38,22 @@ uv run clipforge curate <project> --preset balanced   # per-run cost printed fro
 - Face presence signal is not computed in Phase 2 (comes from the Phase 3 face tracker).
 - Live-chat replay is flagged but not downloaded; the rate extractor is implemented and tested on a synthetic file.
 - Pairwise LLM judge prompt exists (`prompts/v1/judge.md`) but the judge runner is not wired (needs the API).
+
+
+## Live results (added after credit)
+Structured output works on Haiku 4.5, Sonnet 5 and Opus 5 in JSON-schema mode (forced tool use also works on all three).
+`pytest -m live`: 4 passed; prompt cache written then read on a repeat call (reads billed 10x cheaper); meter figures come
+from the API `usage` fields.
+
+| Item | Result |
+|---|---|
+| Eval, prompt v1, Balanced, 6 videos | recall@3 **0.37**, precision@5 **0.58**, starts on sentence **100%**, mid-word cuts **0**, hard-reject pass **100%**, bad-moment hits **0%**, hooks supported **53%**, cost **$0.288** |
+| Prompt v2 (hooks built only from spoken content), 2 videos | hooks supported **100%** (Flynn was 0%), recall@3 0.40, precision@5 0.67, cost $0.098 |
+| Two-stage path live (33.7 min lecture, threshold forced low) | Haiku scan 3 chunks $0.022 + Sonnet curation $0.041 = **$0.063** |
+| 1 hour Balanced cost | **about $0.11** (0.063 / 33.7 min), under the $0.25 gate. Single pass on short videos: $0.018 for 4 min |
+
+Bugs found live (none visible offline): my schema stripper deleted the *field* named `title`, so the model never saw it
+and returned invalid output twice; Sonnet 5 runs adaptive thinking by default (now disabled for these calls to cut cost);
+several hook "failures" were checker weaknesses (apostrophes, tenses) while one was a real invented claim, caught.
+Caveats: only 2 of 6 videos were re-run on prompt v2 to keep spend down, so v2 vs v1 is not a full comparison; recall is
+against my own hand labels (subjective); udio_tutorial recall@3 is 0.00 (the model preferred different, defensible moments).

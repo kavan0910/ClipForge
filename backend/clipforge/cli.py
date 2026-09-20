@@ -160,6 +160,7 @@ def eval_(
     live: bool = typer.Option(
         False, "--live", help="Call the real API for unrecorded requests (costs money)"
     ),
+    only: str = typer.Option("", "--only", help="Comma-separated video ids (cheaper live runs)"),
 ) -> None:
     """Score curation on cached transcripts. Offline by default: replays recorded LLM responses."""
     import tempfile
@@ -184,7 +185,9 @@ def eval_(
         )
     try:
         with tempfile.TemporaryDirectory() as work:
-            report = run_suite(suite, settings, preset, Path(work), real)
+            report = run_suite(
+                suite, settings, preset, Path(work), real, [v for v in only.split(",") if v]
+            )
     except CacheMiss as e:
         typer.echo(typer.style("error: ", fg=typer.colors.RED) + str(e))
         raise typer.Exit(1) from e

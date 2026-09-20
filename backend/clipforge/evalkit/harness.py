@@ -106,13 +106,18 @@ def aggregate(results: list[VideoResult]) -> dict[str, Any]:
 
 
 def run_suite(
-    suite: str, settings: Settings, preset: str, work: Path, real_client: Any | None = None
+    suite: str,
+    settings: Settings,
+    preset: str,
+    work: Path,
+    real_client: Any | None = None,
+    only: list[str] | None = None,
 ) -> dict[str, Any]:
     cfg = json.loads((EVAL_DIR / "suites" / f"{suite}.json").read_text())
     params = CurateParams(preset=preset, n_clips=cfg.get("clips", 5))
     scan, cur = preset_models(preset, settings)
     results = []
-    for vid in cfg["videos"]:
+    for vid in [v for v in cfg["videos"] if not only or v in only]:
         res, _ = run_case(
             vid, settings, params, work, real_client, cache_tag=f"{PROMPT_VERSION}-{preset}"
         )

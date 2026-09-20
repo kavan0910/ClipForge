@@ -23,9 +23,11 @@ from clipforge.signals import combine
 from clipforge.signals.stage import Signals
 from clipforge.store import Project
 
-PROMPT_VERSION = "v1"
+PROMPT_VERSION = "v2"
 PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
-SINGLE_PASS_TOKENS = 30_000
+SINGLE_PASS_TOKENS = int(
+    os.environ.get("CLIPFORGE_SINGLE_PASS_TOKENS", "30000")
+)  # env: cheap live tests of the two-stage path
 Mode = Literal["fresh", "more_like", "shorter", "different_topic"]
 
 HAIKU = "claude-haiku-4-5-20251001"
