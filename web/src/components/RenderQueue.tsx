@@ -23,7 +23,7 @@ export function RenderQueue() {
   }
 
   if (error && !rows) return <div className="alert" role="alert">{error}</div>
-  if (!rows) return <p className="muted">Loading…</p>
+  if (!rows) return <div className="grid gap-3" aria-busy="true"><div className="skeleton" style={{ height: 40, width: 220 }} /><div className="skeleton" style={{ height: 84 }} /><div className="skeleton" style={{ height: 84 }} /></div>
   const ready = rows.filter((r) => r.has_video)
   return (
     <div className="grid gap-4" data-testid="queue">

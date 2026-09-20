@@ -133,7 +133,7 @@ export function ClipEditor({ projectId, clipId, onBack }: { projectId: string; c
   })
 
   if (error) return <div className="alert" role="alert"><strong>{error}</strong><div><button className="btn" onClick={onBack}>Back</button></div></div>
-  if (!data || !edits) return <p className="muted">Loading the editor…</p>
+  if (!data || !edits) return <div className="grid gap-4" aria-busy="true"><div className="skeleton" style={{ height: 48 }} /><div className="skeleton" style={{ height: 520 }} /></div>
   const c = data.clip
   const hasVideo = data.files['base_preview.mp4']
   const ctx = data.words

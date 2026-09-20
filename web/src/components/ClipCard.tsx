@@ -22,33 +22,32 @@ export function ClipCard({
   onDecide: (id: string, status: 'approved' | 'rejected') => void
 }) {
   const score = Math.round(clip.rank_score * 100)
+  const tone = clip.status === 'approved' ? 'ok' : clip.status === 'rejected' ? 'bad' : undefined
   return (
-    <article className="card" data-testid="clip-card" style={{ display: 'grid', gap: 10 }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline' }}>
-        <h3 style={{ fontSize: 16 }}>{clip.title}</h3>
-        <span className="muted" style={{ whiteSpace: 'nowrap' }}>
-          {fmtDuration(clip.start)}–{fmtDuration(clip.end)} · {Math.round(clip.duration)} s
-        </span>
+    <article className="card" data-testid="clip-card" data-hover="true" style={{ display: 'grid', gap: 14, opacity: clip.status === 'rejected' ? 0.62 : 1 }}>
+      <header style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+        <div className="score-ring" style={{ ['--p' as string]: score }} title="Clip score: a blend of the AI's rating and measured audio and audience signals. Not a virality prediction." role="img" aria-label={`Clip score ${score} out of 100 (heuristic)`}>
+          <span>{score}</span>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h3 style={{ fontSize: 17, lineHeight: 1.3 }}>{clip.title}</h3>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
+            <span className="chip">{fmtDuration(clip.start)}–{fmtDuration(clip.end)} · {Math.round(clip.duration)} s</span>
+            {clip.status !== 'proposed' && <span className="chip" data-tone={tone}>{clip.status}</span>}
+            {clip.risk_flags.map((f) => <span key={f} className="chip" data-tone="bad">{f.replace('_', ' ')}</span>)}
+          </div>
+        </div>
       </header>
-      <p style={{ margin: 0, fontWeight: 600 }}>“{clip.hook}”</p>
+      <p style={{ margin: 0, fontWeight: 650, fontSize: 16 }}>“{clip.hook}”</p>
       {!clip.hook_check.passed && (
         <p className="warn" role="note">
           This hook may not match the clip (unsupported: {clip.hook_check.missing.join(', ')}). Edit it before posting.
         </p>
       )}
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span className="muted" title="A blend of the AI's rating and measured audio and audience signals. Not a virality prediction.">
-            Clip score (heuristic)
-          </span>
-          <strong>{score}</strong>
-        </div>
-        <div className="bar" aria-hidden><i style={{ width: `${score}%` }} /></div>
-      </div>
       <p className="muted" style={{ margin: 0 }}>{clip.why_it_works}</p>
       <details>
         <summary className="muted" style={{ cursor: 'pointer' }}>Scores by dimension</summary>
-        <dl style={{ display: 'grid', gridTemplateColumns: '1fr 44px', gap: '4px 12px', margin: '8px 0 0' }}>
+        <dl style={{ display: 'grid', gridTemplateColumns: '1fr 44px', gap: '6px 12px', margin: '10px 0 0' }}>
           {DIMENSIONS.map(([k, label]) => (
             <div key={k} style={{ display: 'contents' }}>
               <dt>
@@ -61,10 +60,7 @@ export function ClipCard({
         </dl>
       </details>
       <footer style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        {clip.risk_flags.map((f) => (
-          <span key={f} className="warn" style={{ padding: '2px 8px' }}>{f.replace('_', ' ')}</span>
-        ))}
-        <span className="muted" style={{ flex: 1 }}>{clip.hashtags.map((h) => `#${h}`).join(' ')}</span>
+        <span className="muted" style={{ flex: 1, fontSize: 13 }}>{clip.hashtags.map((h) => `#${h}`).join(' ')}</span>
         <button className="btn" onClick={() => onMoreLike(clip.id)}>More like this</button>
         <button className="btn" aria-pressed={clip.status === 'approved'} onClick={() => onDecide(clip.id, 'approved')} data-testid="card-approve">Approve</button>
         <button className="btn btn-danger" aria-pressed={clip.status === 'rejected'} onClick={() => onDecide(clip.id, 'rejected')}>Reject</button>

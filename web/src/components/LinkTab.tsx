@@ -62,7 +62,7 @@ export function LinkTab({ onStart }: { onStart: (id: string) => void }) {
       />
       <p className="notice">Only process videos you own or have permission to reuse.</p>
       <div aria-live="polite">
-        {busy && <p className="muted">Reading video details…</p>}
+        {busy && <p className="muted"><span className="spinner" /> Reading video details…</p>}
         {error && (
           <div className="alert" role="alert">
             <strong>{error.message}</strong>

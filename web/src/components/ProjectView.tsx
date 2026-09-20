@@ -94,7 +94,7 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
     return () => unsub.current()
   }, [refresh, listen])
 
-  if (!project) return <p className="muted">Loading…</p>
+  if (!project) return <div className="grid gap-4" aria-busy="true"><div className="skeleton" style={{ height: 56 }} /><div className="skeleton" style={{ height: 260 }} /><div className="skeleton" style={{ height: 120 }} /></div>
   const running = project.status === 'running'
   const activeIndex = STEPS.findIndex((s) => !steps[s.key]?.done)
 

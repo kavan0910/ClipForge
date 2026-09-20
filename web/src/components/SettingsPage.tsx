@@ -25,7 +25,7 @@ export function SettingsPage() {
   const set = (k: string, v: string) => setValues((x) => ({ ...x, [k]: v }))
 
   if (error && !s) return <div className="alert" role="alert">{error}</div>
-  if (!s) return <p className="muted">Loading…</p>
+  if (!s) return <div className="grid gap-4" aria-busy="true"><div className="skeleton" style={{ height: 40, width: 200 }} /><div className="skeleton" style={{ height: 200 }} /><div className="skeleton" style={{ height: 200 }} /></div>
   return (
     <div className="grid gap-4" data-testid="settings">
       <h1 style={{ fontSize: 24 }}>Settings</h1>
