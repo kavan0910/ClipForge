@@ -23,6 +23,11 @@ def _child_env() -> dict[str, str]:
     env["PYTHONPATH"] = os.pathsep.join(
         p for p in (str(BACKEND_DIR), env.get("PYTHONPATH", "")) if p
     )
+    homebrew_lib = "/opt/homebrew/lib"  # torchcodec/PyAV dlopen FFmpeg here on Apple Silicon
+    if Path(homebrew_lib).is_dir():
+        env["DYLD_FALLBACK_LIBRARY_PATH"] = os.pathsep.join(
+            p for p in (env.get("DYLD_FALLBACK_LIBRARY_PATH", ""), homebrew_lib) if p
+        )
     return env
 
 

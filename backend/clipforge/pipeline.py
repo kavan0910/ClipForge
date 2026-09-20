@@ -367,6 +367,15 @@ def transcribe(
                 # Diarization is optional: keep single-speaker mode and tell the user why.
                 project.emit("warning", message=e.message, action=e.action)
                 turns = []
+            except (
+                Exception
+            ) as e:  # e.g. torchcodec cannot find FFmpeg: never lose a finished transcript
+                project.emit(
+                    "warning",
+                    message="Speaker identification was skipped: " + str(e).splitlines()[0][:160],
+                    action="Transcription is unaffected; all speech is treated as one speaker. See the README for the FFmpeg fix.",
+                )
+                turns = []
             if turns:
                 words = assign_speakers(words, label_speakers(turns))
                 diarized = True
