@@ -2,6 +2,7 @@ import { Player, type PlayerRef } from '@remotion/player'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CaptionsLayer } from '@captions/Captions'
 import type { CaptionProps, Template, Timeline } from '@captions/types'
+import { PublishPanel } from './PublishPanel'
 import { api, type ClipEdits, type EditorData } from '../api'
 import { LAYOUT_CHOICES, activeWord, addExclude, fmtClock, removeExclude, srcToOut, type Range } from '../editor'
 
@@ -259,6 +260,8 @@ export function ClipEditor({ projectId, clipId, onBack }: { projectId: string; c
               </ul>
             )}
           </section>
+
+          <PublishPanel projectId={projectId} clipId={clipId} rendered={!!data.files['out.mp4']} />
 
           <section className="card" aria-label="Captions">
             <h3 style={{ fontSize: 15 }}>Captions</h3>

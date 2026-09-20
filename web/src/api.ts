@@ -120,10 +120,11 @@ export interface EditorData {
   brand_kits: string[]
 }
 export interface RenderRow { project: string; clip: string; title: string; duration: number; state: RenderState['state']; pct: number; note?: string | null; has_video: boolean; status: string; error?: { message: string; action: string } }
-export interface SettingsData { anthropic_api_key: string | null; hf_token: string | null; values: Record<string, string>; data_dir: string }
+export interface SettingsData { anthropic_api_key: string | null; hf_token: string | null; google_client_secret: string | null; values: Record<string, string>; data_dir: string }
 export interface DoctorCheck { name: string; status: 'ok' | 'warn' | 'fail'; detail: string; fix: string }
 export interface StorageData { projects: { id: string; bytes: number; intermediate_bytes: number }[]; total_bytes: number; free_bytes: number }
 export interface BrandKitData { id: string; name: string; text_color: string | null; accent_color: string | null; default_template: string; vocabulary: string[]; logo: unknown; intro: { title: string } | null; outro: { title: string } | null }
+export interface YtJob { state: 'idle' | 'running' | 'done' | 'error'; pct: number; url?: string; scheduled_for?: string | null; warnings?: string[]; message?: string; action?: string }
 export interface ProjectRow { id: string; title: string; status: string }
 
 export type SourceSpec =
@@ -152,12 +153,18 @@ export const api = {
   exportClips: (clips: [string, string][], format: string) => request<{ path: string; name: string; warnings: string[]; is_zip: boolean }>('/api/export', { method: 'POST', body: JSON.stringify({ clips, format }) }),
   settings: () => request<SettingsData>('/api/settings'),
   saveSettings: (values: Record<string, string>) => request<{ ok: boolean }>('/api/settings', { method: 'PUT', body: JSON.stringify({ values }) }),
-  saveSecrets: (body: { anthropic_api_key?: string; hf_token?: string }) => request<{ ok: boolean }>('/api/settings/secrets', { method: 'PUT', body: JSON.stringify(body) }),
+  saveSecrets: (body: { anthropic_api_key?: string; hf_token?: string; google_client_secret?: string }) => request<{ ok: boolean }>('/api/settings/secrets', { method: 'PUT', body: JSON.stringify(body) }),
   doctor: () => request<{ ok: boolean; checks: DoctorCheck[] }>('/api/doctor'),
   storage: () => request<StorageData>('/api/storage'),
   cleanup: (id: string) => request<{ freed_bytes: number }>(`/api/projects/${id}/cleanup`, { method: 'POST' }),
   brandKits: () => request<BrandKitData[]>('/api/brand'),
   saveBrand: (kit: Record<string, unknown>) => request<{ ok: boolean }>(`/api/brand/${kit.id as string}`, { method: 'PUT', body: JSON.stringify(kit) }),
+  makePackage: (id: string, cid: string) => request<{ path: string }>(`/api/projects/${id}/clips/${cid}/package`, { method: 'POST' }),
+  ytStatus: () => request<{ configured: boolean; connected: boolean; message?: string; action?: string }>('/api/publish/youtube/status'),
+  ytConnect: () => request<{ connected: boolean }>('/api/publish/youtube/connect', { method: 'POST' }),
+  ytDisconnect: () => request<{ connected: boolean }>('/api/publish/youtube/disconnect', { method: 'POST' }),
+  ytPublish: (id: string, cid: string, body: { schedule?: string; privacy?: string }) => request<{ state: string }>(`/api/projects/${id}/clips/${cid}/publish/youtube`, { method: 'POST', body: JSON.stringify(body) }),
+  ytJob: (id: string, cid: string) => request<YtJob>(`/api/projects/${id}/clips/${cid}/publish/youtube`),
   updateYtdlp: () => request<{ ok: boolean; note: string }>('/api/ytdlp/update', { method: 'POST' }),
 }
 

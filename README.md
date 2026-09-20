@@ -4,7 +4,7 @@ Local-first AI clipping studio: one long video in, ready-to-post vertical shorts
 Your video never leaves this machine. Only transcript text and light metadata go to the
 Anthropic API for the editorial step (Phase 2), and the UI says so.
 
-**Status: Phase 5 of 6 done (review UI, render queue, export, settings). Phase 6 (publishing, audiogram, final report) next.** See `docs/PLAN.md` and `docs/checkpoints/`.
+**Status: all six phases built.** See `docs/checkpoints/phase-6.md` for the final report (measured performance, quality, cost, gaps). See `docs/PLAN.md` and `docs/checkpoints/`.
 
 ## Setup
 
@@ -38,7 +38,17 @@ CLI: `clipforge run <url|path> --clips 8 --duration 30-60 --preset balanced --st
   autosave. Keyboard: Space play, J/K/L, `[` `]` in/out, A/R approve/reject, X/U cut/restore, arrows step by word.
 - Render queue with cancel and download; export as MP4 folder/zip, OpenTimelineIO, FCPXML, FCP7 XML or CMX 3600 EDL (cuts as edits on the source).
 - Settings: keys (masked, written to `.env` mode 600), preferences, health check, storage cleanup, brand kits.
+- Audio-only sources (podcasts, .mp3/.m4a/.wav/.ogg/.flac) render as an audiogram: designed canvas, title, audio-reactive spectrum, same captions and loudness.
+- Publishing: upload to YouTube from the editor (OAuth, resumable, scheduling) or make a ready-to-upload package with copy for YouTube Shorts,
+  Instagram Reels and TikTok.
 - Live progress over SSE, cancel (kills the whole process tree) and resume.
+
+## Publishing
+
+YouTube: create a **Desktop app** OAuth client in Google Cloud Console (enable YouTube Data API v3), put the client id and secret in Settings,
+then choose Connect YouTube in a clip's Publish panel. Limits, all enforced by Google: about 6 uploads per day on the default quota; API projects
+that have not passed YouTube's compliance audit can only upload private videos; custom thumbnails need a verified channel. Scheduling keeps the
+video private until the chosen time. Instagram and TikTok have no upload API usable by a local app (ADR-010), so use the package.
 
 ## Hardware notes
 
@@ -51,12 +61,12 @@ small teams; larger companies need a licence (`captions/README.md`).
 
 ## Costs
 
-Curation is the only step that calls the API (transcript text only). Its cost is estimated at about $0.15 per hour of video in Balanced mode
-and will be measured against the API `usage` fields in Phase 2.
+Curation is the only step that calls the API (transcript text only). Measured from the API `usage` fields: about $0.11 per hour of video in
+Balanced mode (Haiku scan, Sonnet 5 curator), with a hard per-job cap (`MAX_JOB_COST_USD`, default $1). Everything else runs on your machine.
 
 ## Licences and terms
 
-- Remotion (captions, Phase 4) is free for individuals and small companies; larger for-profit companies need
+- Remotion (captions) is free for individuals and small companies; larger for-profit companies need
   a company licence. See `captions/README.md`.
 - Models: Whisper (MIT), Silero VAD (MIT), pyannote community-1 (CC-BY-4.0, gated: accept the terms on Hugging Face).
 - **Downloading:** only process videos you own or have permission to reuse. Downloading may violate a site's
@@ -66,7 +76,8 @@ and will be measured against the API `usage` fields in Phase 2.
 
 - Speaker diarization needs your Hugging Face account to accept the pyannote terms; until then it degrades to
   single-speaker mode with a visible warning.
-- The LLM path is verified offline only until the API key has credit (see `docs/checkpoints/phase-2.md`).
+- YouTube upload is tested against a protocol-level mock, not Google's live servers (needs your OAuth client).
+- Word-onset accuracy of +/-50 ms is not met (27%); mitigated by acoustic snapping and a caption lead (ADR-003).
 - Active speaker is only verified on synthetic multi-person scenes; see `docs/checkpoints/phase-3.md`.
 - No SQLite index yet: the filesystem manifests are the source of truth; the index arrives with clips in Phase 2.
 - FCPXML cannot express NTSC frame rates in the bundled adapter: exports fall back to an integer rate and say so.

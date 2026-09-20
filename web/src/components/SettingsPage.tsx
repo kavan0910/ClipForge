@@ -7,6 +7,7 @@ export function SettingsPage() {
   const [values, setValues] = useState<Record<string, string>>({})
   const [key, setKey] = useState('')
   const [hf, setHf] = useState('')
+  const [gs, setGs] = useState('')
   const [doctor, setDoctor] = useState<DoctorCheck[] | null>(null)
   const [storage, setStorage] = useState<StorageData | null>(null)
   const [kits, setKits] = useState<BrandKitData[]>([])
@@ -40,7 +41,11 @@ export function SettingsPage() {
         <label style={{ display: 'block', marginTop: 8 }}>Hugging Face token <span className="muted">{s.hf_token ?? 'not set'}</span>
           <input className="field" type="password" autoComplete="off" value={hf} onChange={(e) => setHf(e.target.value)} placeholder="hf_…" />
         </label>
-        <button className="btn btn-primary" style={{ marginTop: 10 }} disabled={!key && !hf} onClick={() => { wrap(api.saveSecrets({ ...(key ? { anthropic_api_key: key } : {}), ...(hf ? { hf_token: hf } : {}) }), 'Keys saved.'); setKey(''); setHf('') }}>Save keys</button>
+        <label style={{ display: 'block', marginTop: 8 }}>Google OAuth client secret (YouTube) <span className="muted">{s.google_client_secret ?? 'not set'}</span>
+          <input className="field" type="password" autoComplete="off" value={gs} onChange={(e) => setGs(e.target.value)} placeholder="GOCSPX-…" />
+        </label>
+        <p className="muted" style={{ fontSize: 12, margin: '4px 0 0' }}>The client id goes in Preferences below (GOOGLE CLIENT ID). Create a Desktop-app OAuth client with the YouTube Data API v3 enabled.</p>
+        <button className="btn btn-primary" style={{ marginTop: 10 }} disabled={!key && !hf && !gs} onClick={() => { wrap(api.saveSecrets({ ...(key ? { anthropic_api_key: key } : {}), ...(hf ? { hf_token: hf } : {}), ...(gs ? { google_client_secret: gs } : {}) }), 'Keys saved.'); setKey(''); setHf(''); setGs('') }}>Save keys</button>
       </section>
 
       <section className="card" aria-label="Preferences">

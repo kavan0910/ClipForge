@@ -50,6 +50,7 @@ class SettingsUpdate(BaseModel):
 class ApiKey(BaseModel):
     anthropic_api_key: str | None = None
     hf_token: str | None = None
+    google_client_secret: str | None = None
 
 
 def slug(text: str) -> str:
@@ -272,6 +273,9 @@ def register(
                 s.anthropic_api_key.get_secret_value() if s.anthropic_api_key else None
             ),
             "hf_token": settings_store.mask(s.hf_token.get_secret_value() if s.hf_token else None),
+            "google_client_secret": settings_store.mask(
+                s.google_client_secret.get_secret_value() if s.google_client_secret else None
+            ),
             "values": {
                 "CLIPFORGE_SCAN_MODEL": s.scan_model,
                 "CLIPFORGE_CURATE_MODEL": s.curate_model,
@@ -283,6 +287,7 @@ def register(
                 "MAX_SOURCE_HEIGHT": str(s.max_source_height),
                 "YTDLP_COOKIES_FROM_BROWSER": s.ytdlp_cookies_from_browser or "",
                 "RENDER_WORKERS": str(s.render_workers or ""),
+                "GOOGLE_CLIENT_ID": s.google_client_id or "",
             },
             "data_dir": str(s.data_dir.expanduser()),
         }
@@ -306,6 +311,8 @@ def register(
             upd["ANTHROPIC_API_KEY"] = k.anthropic_api_key.strip()
         if k.hf_token:
             upd["HF_TOKEN"] = k.hf_token.strip()
+        if k.google_client_secret:
+            upd["GOOGLE_CLIENT_SECRET"] = k.google_client_secret.strip()
         if upd:
             settings_store.write_env(upd)
         return {"ok": True}

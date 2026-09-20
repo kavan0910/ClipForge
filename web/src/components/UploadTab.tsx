@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { abortUpload, api, ApiError, uploadFile } from '../api'
 import { fmtBytes } from '../format'
 
-const ACCEPT = '.mp4,.mov,.mkv,.webm,.avi,.m4v,.mp3,.wav,.m4a'
+const ACCEPT = '.mp4,.mov,.mkv,.webm,.avi,.m4v,.mp3,.wav,.m4a,.ogg,.opus,.flac,.aac'
 
 export function UploadTab({ onStart }: { onStart: (id: string) => void }) {
   const [over, setOver] = useState(false)

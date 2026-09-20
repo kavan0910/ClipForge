@@ -264,8 +264,12 @@ def render(
             typer.echo(
                 f"{c.id}: {r.path} ({m['clip_seconds']} s clip, rendered in {m['render_seconds']} s)"
             )
-            typer.echo(f"   LUFS {m['loudness']['lufs']}  TP {m['loudness']['true_peak_dbtp']} dBTP  "
-                       f"A/V drift {m['av_drift_frames']} frames  jerk p99 {m['jerk']['p99']}  layouts {m['layout']['layouts']}")  # fmt: skip
+            line = f"   LUFS {m['loudness']['lufs']}  TP {m['loudness']['true_peak_dbtp']} dBTP"
+            if "av_drift_frames" in m:
+                line += f"  A/V drift {m['av_drift_frames']} frames  jerk p99 {m['jerk']['p99']}  layouts {m['layout']['layouts']}"
+            else:
+                line += "  layout audiogram (audio-only source)"
+            typer.echo(line)
     except Cancelled:
         raise typer.Exit(130) from None
     except ClipforgeError as e:

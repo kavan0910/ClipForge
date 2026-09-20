@@ -16,7 +16,7 @@ from clipforge.models import AudioTrack, Probe, QualityReport, VideoInfo
 from clipforge.procs import CancelToken, run_streaming
 
 VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"}
-AUDIO_EXTS = {".mp3", ".wav", ".m4a"}
+AUDIO_EXTS = {".mp3", ".wav", ".m4a", ".ogg", ".opus", ".flac", ".aac"}
 ACCEPTED_EXTS = VIDEO_EXTS | AUDIO_EXTS
 HDR_TRANSFERS = {"smpte2084", "arib-std-b67"}
 GIB = 1024**3

@@ -134,6 +134,9 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
     from clipforge.api import editor as editor_routes
 
     editor_routes.register(app, open_project, projects_dir, settings)
+    from clipforge.api import publish as publish_routes
+
+    publish_routes.register(app, open_project, settings)
 
     # -- link source ------------------------------------------------------
     @app.post("/api/sources/resolve")

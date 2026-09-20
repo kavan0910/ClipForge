@@ -41,7 +41,9 @@ def test_roundtrip_and_monotonic_mapping(keep, data):
     out = edl.src_to_out(t)
     assert out is not None and 0 <= out <= edl.duration + 1e-9
     back = edl.out_to_src(out)
-    if abs(t - b) < 1e-6:  # the end of one kept range and the start of the next share one output instant
+    if (
+        abs(t - b) < 1e-6
+    ):  # the end of one kept range and the start of the next share one output instant
         assert edl.src_to_out(back) == pytest.approx(out, abs=1e-6)
     else:
         assert back == pytest.approx(t, abs=1e-6)

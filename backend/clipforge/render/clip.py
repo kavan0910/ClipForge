@@ -36,7 +36,7 @@ from clipforge.store import Project
 class RenderResult:
     path: Path
     edl: EDL
-    solved: Solved
+    solved: Solved | None
     seconds: float
     measure: dict
 
@@ -85,10 +85,24 @@ def render_clip(
     cancel = cancel or CancelToken()
     report = reporter.progress if reporter else (lambda *a, **k: None)
     if not source.has_video or not source.probe.video or not source.proxy_path:
-        raise MediaError(
-            "This source has no video, so there is nothing to reframe.",
-            "Audio-only sources use the audiogram layout (later phase).",
+        from clipforge.render.audiogram import render_audiogram
+
+        out = render_audiogram(
+            project,
+            source,
+            transcript,
+            clip,
+            level,
+            fast,
+            reporter,
+            cancel,
+            captions,
+            brand,
+            brand_root,
         )
+        d = clip_dir(project, clip.id)
+        return RenderResult(out, EDL.model_validate_json((d / "edl.json").read_text()), None, time.time() - t_start,
+                            json.loads((d / "measure.json").read_text()))  # fmt: skip
     video = source.probe.video
     d = clip_dir(project, clip.id)
     master = Path(source.master_path)
