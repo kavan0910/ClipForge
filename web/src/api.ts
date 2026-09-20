@@ -1,5 +1,21 @@
 const metaToken = document.querySelector<HTMLMetaElement>('meta[name="clipforge-token"]')?.content
-const TOKEN = metaToken ?? import.meta.env.VITE_CLIPFORGE_TOKEN ?? ''
+let TOKEN = metaToken ?? import.meta.env.VITE_CLIPFORGE_TOKEN ?? ''
+
+/** The server makes a new session token on every start, so a page opened before a restart holds a stale one.
+ * Fetch the current page again, take its token, and let the caller retry. */
+async function refreshToken(): Promise<boolean> {
+  try {
+    const html = await (await fetch('/', { cache: 'no-store' })).text()
+    const fresh = /name="clipforge-token" content="([^"]+)"/.exec(html)?.[1]
+    if (fresh && fresh !== TOKEN) {
+      TOKEN = fresh
+      return true
+    }
+  } catch {
+    /* the server is not reachable: the normal error path reports it */
+  }
+  return false
+}
 
 export class ApiError extends Error {
   action: string
@@ -13,7 +29,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}, retried = false): Promise<T> {
   const headers = new Headers(init.headers)
   headers.set('x-clipforge-token', TOKEN)
   if (init.body && typeof init.body === 'string') headers.set('content-type', 'application/json')
@@ -25,6 +41,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new ApiError('Cannot reach the Clipforge server.', 'Is `make start` still running?')
   }
   const body = await res.json().catch(() => ({}))
+  if (res.status === 403 && body.code === 'forbidden' && !retried && (await refreshToken())) return request<T>(path, init, true)
   if (!res.ok) {
     throw new ApiError(body.message ?? body.detail ?? `Request failed (${res.status})`, body.action ?? '', res.status, body.offset)
   }
