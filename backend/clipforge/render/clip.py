@@ -23,6 +23,7 @@ from clipforge.errors import ClipforgeError, MediaError
 from clipforge.models import Source, Transcript
 from clipforge.pipeline import Reporter, rms_db_frames
 from clipforge.procs import CancelToken, run_streaming
+from clipforge.reframe import camera as cam_mod
 from clipforge.reframe import plan as rplan
 from clipforge.reframe.camera import Rect, crop_size
 from clipforge.reframe.solve import OUT_H, OUT_W, Solved, solve
@@ -141,7 +142,9 @@ def render_clip(
     cw, _ = crop_size(scene.width, scene.height, OUT_W / OUT_H, 1.0)
     shots = rplan.shots_from_cuts(clip_start, clip_end, scene_cuts or [])
     plan = rplan.build_plan(scene, shots, turns, cw, overrides=clipedits.layout_overrides(edits))
-    solved = solve(scene, plan, edl, fps, punch_in=punch_in)
+    solved = solve(
+        scene, plan, edl, fps, punch_in=punch_in, max_zoom=cam_mod.max_zoom_for(video.height)
+    )
     (d / "reframe.json").write_text(json.dumps({
         "plan": [{"t0": s.t0, "t1": s.t1, "layout": s.layout, "focus": s.focus, "cam_track": s.cam_track,
                   "tracks": s.tracks} for s in plan],
@@ -211,7 +214,7 @@ def render_clip(
     meas = rmeasure.measure_clip(out, solved, edl, check_faces, offset_frames=len(head))
     meas["render_seconds"] = round(time.time() - t_start, 1)
     meas["clip_seconds"] = round(edl.duration, 2)
-    meas["encoder"] = "h264_videotoolbox" if fast else "libx264 slow crf17"
+    meas["encoder"] = "h264_videotoolbox" if fast else "libx264 slow crf15"
     (d / "measure.json").write_text(json.dumps(meas, indent=1))
     rmeta.write_metadata(
         project,

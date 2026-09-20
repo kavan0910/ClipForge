@@ -86,7 +86,20 @@ def _warp(frame: np.ndarray, r: Rect, w: int, h: int) -> np.ndarray:
     fh, fw = frame.shape[:2]
     cw, ch = min(max(round(r.w), 2), fw), min(max(round(r.h), 2), fh)
     x0, y0 = min(max(round(r.x), 0), fw - cw), min(max(round(r.y), 0), fh - ch)
-    return cv2.resize(frame[y0 : y0 + ch, x0 : x0 + cw], (w, h), interpolation=cv2.INTER_LANCZOS4)
+    out = cv2.resize(frame[y0 : y0 + ch, x0 : x0 + cw], (w, h), interpolation=cv2.INTER_LANCZOS4)
+    return sharpen_for_upscale(out, h / ch)
+
+
+def sharpen_for_upscale(img: np.ndarray, scale: float) -> np.ndarray:
+    """Enlarging always softens edges; restore them with an unsharp mask sized to how much we enlarged.
+    Nothing is done for crops that are not enlarged (a 4K source), and the amount is capped so it never rings."""
+    if scale <= 1.15:
+        return img
+    import cv2
+
+    amount = min(0.35 + 0.45 * (scale - 1.15), 0.85)
+    blur = cv2.GaussianBlur(img, (0, 0), 1.3)
+    return cv2.addWeighted(img, 1.0 + amount, blur, -amount, 0)
 
 
 def _fit_blur(frame: np.ndarray, w: int, h: int) -> np.ndarray:
@@ -154,7 +167,7 @@ def encode_argv(
     video = codec_args or (
         ["-c:v", "h264_videotoolbox", "-q:v", "65", "-profile:v", "high", "-allow_sw", "1"]
         if fast
-        else ["-c:v", "libx264", "-profile:v", "high", "-preset", "slow", "-crf", "17",
+        else ["-c:v", "libx264", "-profile:v", "high", "-preset", "slow", "-crf", "15",
               "-x264-params", "colorprim=bt709:transfer=bt709:colmatrix=bt709:fullrange=off"]
     )  # fmt: skip
     argv = ["ffmpeg", "-nostdin", "-v", "error", "-y",

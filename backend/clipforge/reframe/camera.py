@@ -42,6 +42,12 @@ class Rect:
     h: float
 
 
+def max_zoom_for(src_h: int, out_h: int = 1920, max_upscale: float = 2.2) -> float:
+    """Extra zoom is only allowed while the total upscale of the source stays sharp: a 1080p source already
+    needs 1.78x for a vertical crop, so it gets little extra zoom; a 4K source gets the full cap."""
+    return float(np.clip(src_h * max_upscale / out_h, 1.0, MAX_ZOOM))
+
+
 def crop_size(src_w: int, src_h: int, aspect: float, zoom: float) -> tuple[float, float]:
     """Largest crop of the given aspect (w/h) that fits, divided by zoom."""
     ch = float(src_h)

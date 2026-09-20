@@ -68,7 +68,7 @@ def _rect_at(paths: dict[str, np.ndarray], k: int, sw: int, sh: int) -> Rect:
 
 def solve(
     scene: Scene, plan: list[LayoutSegment], edl: EDL, out_fps: float, aspect: float = OUT_W / OUT_H,
-    punch_in: float = 1.0,
+    punch_in: float = 1.0, max_zoom: float = cam.MAX_ZOOM,
 ) -> Solved:  # fmt: skip
     """Per-output-frame layout and crops. Paths are computed in source time, then EDL-remapped.
 
@@ -83,7 +83,7 @@ def solve(
         d: dict = {"seg": seg, "cuts": []}
         if seg.layout == "single":
             ids = sorted({x[2] for x in seg.focus})
-            paths = _track_paths(scene, grid, ids, aspect, cam.MAX_ZOOM)
+            paths = _track_paths(scene, grid, ids, aspect, max_zoom)
             intervals = [(a, b, i) for a, b, i in seg.focus]
             xs, cuts = cam.stitch_focus(grid, intervals, {i: paths[i]["x"] for i in ids}, sw)
             ys, _ = cam.stitch_focus(grid, intervals, {i: paths[i]["y"] for i in ids}, sh * 4)
@@ -103,7 +103,7 @@ def solve(
             )
         elif seg.layout == "stacked":
             half_aspect = OUT_W / (OUT_H / 2)
-            tp = _track_paths(scene, grid, list(seg.tracks), half_aspect, cam.MAX_ZOOM)
+            tp = _track_paths(scene, grid, list(seg.tracks), half_aspect, max_zoom)
             d.update(stack=tp)
         elif seg.layout == "screen_cam" and seg.cam_track is not None:
             tr = scene.tracks[seg.cam_track]
