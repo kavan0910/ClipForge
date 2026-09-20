@@ -20,6 +20,7 @@ export function ClipEditor({ projectId, clipId, onBack }: { projectId: string; c
   const [starting, setStarting] = useState(false)
   const [editing, setEditing] = useState<number | null>(null)
   const [quality, setQuality] = useState<'auto' | 'off'>('auto')
+  const [tab, setTab] = useState<'edit' | 'captions' | 'layout' | 'publish'>('edit')
   const [saved, setSaved] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [cap, setCap] = useState<{ timeline: Timeline; template: Template } | null>(null)
   const video = useRef<HTMLVideoElement>(null)
@@ -145,54 +146,89 @@ export function ClipEditor({ projectId, clipId, onBack }: { projectId: string; c
   const autoRemovals = data.removed.filter((r) => r.kind !== 'manual' && !r.restored)
   const manualRanges = edits.exclude
 
+  const tabs: [typeof tab, string, string?][] = [
+    ['edit', 'Trim & transcript'],
+    ['captions', 'Captions'],
+    ['layout', 'Layout', data.layouts.length ? String(data.layouts.length) : undefined],
+    ['publish', 'Details & publish'],
+  ]
+  const pct = Math.round(data.render.pct * 100)
+
   return (
     <div className="grid gap-4" data-testid="clip-editor">
-      <header style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+      <header className="ed-head">
         <button className="btn" onClick={onBack}>← Clips</button>
-        <input className="field" style={{ flex: 1, minWidth: 220 }} aria-label="Title" value={edits.title ?? c.title} onChange={(e) => change({ title: e.target.value })} maxLength={60} />
-        <span className="muted" aria-live="polite">{saved === 'saving' ? 'Saving…' : saved === 'saved' ? 'Saved' : ''}</span>
+        <input className="field ed-title" aria-label="Title" value={edits.title ?? c.title} onChange={(e) => change({ title: e.target.value })} maxLength={60} />
+        <span className="muted" aria-live="polite" style={{ minWidth: 60 }}>{saved === 'saving' ? 'Saving…' : saved === 'saved' ? 'Saved' : ''}</span>
+        <span className="chip" data-testid="clip-status" data-tone={c.status === 'approved' ? 'ok' : c.status === 'rejected' ? 'bad' : undefined}>{c.status}</span>
         <button className="btn" aria-pressed={c.status === 'approved'} onClick={() => decide('approved')} data-testid="approve">Approve <kbd>A</kbd></button>
         <button className="btn btn-danger" aria-pressed={c.status === 'rejected'} onClick={() => decide('rejected')} data-testid="reject">Reject <kbd>R</kbd></button>
-        <span className="warn" data-testid="clip-status" style={{ padding: '2px 10px' }}>{c.status}</span>
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,360px) minmax(0,1fr)', gap: 20 }} className="editor-cols">
-        <section aria-label="Preview">
-          <div style={{ position: 'relative', width: 360, height: 640, background: '#000', borderRadius: 12, overflow: 'hidden' }}>
+      <div className="studio">
+        <aside className="studio-side" aria-label="Preview and render">
+          <div className="phone">
             {hasVideo ? (
               <>
-                <video ref={video} src={`/api/files/${projectId}/clips/${clipId}/base_preview.mp4?v=${data.render.state}${stale ? 's' : ''}`} style={{ width: 360, height: 640 }} playsInline data-testid="preview-video" />
+                <video ref={video} src={`/api/files/${projectId}/clips/${clipId}/base_preview.mp4?v=${data.render.state}${stale ? 's' : ''}`} playsInline data-testid="preview-video" />
                 {capProps && (
-                  <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: stale ? 0.5 : 1 }} aria-hidden>
-                    <Player ref={player} component={CaptionsLayer as never} inputProps={capProps as never} durationInFrames={Math.max(1, Math.ceil(cap!.timeline.duration * FPS))} compositionWidth={1080} compositionHeight={1920} fps={FPS} controls={false} style={{ width: 360, height: 640 }} acknowledgeRemotionLicense />
+                  <div className="phone-overlay" style={{ opacity: stale ? 0.5 : 1 }} aria-hidden>
+                    <Player ref={player} component={CaptionsLayer as never} inputProps={capProps as never} durationInFrames={Math.max(1, Math.ceil(cap!.timeline.duration * FPS))} compositionWidth={1080} compositionHeight={1920} fps={FPS} controls={false} style={{ width: '100%', height: '100%' }} acknowledgeRemotionLicense />
                   </div>
                 )}
               </>
             ) : (
-              <div style={{ display: 'grid', placeItems: 'center', height: '100%', padding: 24, textAlign: 'center', color: '#9aa2af' }}>
-                Nothing to preview yet. Render this clip once and the preview appears here.
+              <div className="phone-empty">
+                <div className="drop-icon" aria-hidden><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg></div>
+                <strong>No preview yet</strong>
+                <span className="muted">Render this clip once and it plays here with live captions.</span>
               </div>
             )}
           </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-            <span className="mono" data-testid="clock">{fmtClock(time)} / {fmtClock(data.duration)}</span>
-            <span className="muted" style={{ fontSize: 12 }}>Space play · J back · K pause · L faster · ←/→ word</span>
-          </div>
-          {stale && <p className="warn" role="status" style={{ marginTop: 8 }}>Your edits are saved. Render again to refresh the video preview.</p>}
-          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-            <button className="btn btn-primary" onClick={doRender} disabled={busy} data-testid="render">
-              {busy ? `Rendering ${Math.round(data.render.pct * 100)}%` : 'Render clip'}
-            </button>
-            <select className="field" aria-label="Render quality" style={{ width: 'auto' }} value={quality} onChange={(e) => setQuality(e.target.value as 'auto' | 'off')} disabled={busy}>
-              <option value="auto">Best quality (AI upscale, slower)</option>
-              <option value="off">Fast (standard scaling)</option>
-            </select>
-            {busy && <button className="btn" onClick={() => void api.cancelRender(projectId, clipId).then(load)}>Cancel</button>}
-          </div>
-          {data.render.state === 'error' && <p className="alert" role="alert">{data.render.error?.message} {data.render.error?.action}</p>}
-        </section>
+          <div className="timecode"><span className="mono" data-testid="clock">{fmtClock(time)} / {fmtClock(data.duration)}</span></div>
 
-        <div className="grid gap-4">
+          <div className="card render-box">
+            <label className="muted" style={{ fontSize: 12 }}>Quality
+              <select className="field" aria-label="Render quality" value={quality} onChange={(e) => setQuality(e.target.value as 'auto' | 'off')} disabled={busy} style={{ marginTop: 4 }}>
+                <option value="auto">Best quality (AI upscale, slower)</option>
+                <option value="off">Fast (standard scaling)</option>
+              </select>
+            </label>
+            <button className="btn btn-primary" onClick={doRender} disabled={busy} data-testid="render" style={{ width: '100%' }}>
+              {busy ? `Rendering ${pct}%` : 'Render clip'}
+            </button>
+            {busy && (
+              <>
+                <div className="bar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}><i style={{ width: `${pct}%` }} /></div>
+                {data.render.note && <span className="muted" style={{ fontSize: 12 }}>{data.render.note}</span>}
+                <button className="btn" onClick={() => void api.cancelRender(projectId, clipId).then(load)}>Cancel render</button>
+              </>
+            )}
+            {stale && !busy && <p className="warn" role="status" style={{ margin: 0 }}>Edits saved. Render again to refresh the video.</p>}
+            {data.render.state === 'error' && <p className="alert" role="alert" style={{ margin: 0 }}>{data.render.error?.message} {data.render.error?.action}</p>}
+            <details>
+              <summary className="muted" style={{ cursor: 'pointer', fontSize: 12 }}>Keyboard shortcuts</summary>
+              <p className="muted" style={{ margin: '6px 0 0', fontSize: 12, lineHeight: 1.7 }}>
+                <kbd>Space</kbd> play · <kbd>J</kbd> back · <kbd>K</kbd> pause · <kbd>L</kbd> faster<br />
+                <kbd>←</kbd><kbd>→</kbd> word · <kbd>[</kbd><kbd>]</kbd> set start / end<br />
+                <kbd>X</kbd> cut · <kbd>U</kbd> put back · <kbd>E</kbd> edit word · <kbd>A</kbd>/<kbd>R</kbd> approve / reject
+              </p>
+            </details>
+          </div>
+        </aside>
+
+        <main className="studio-main">
+          <div className="ptabs" role="tablist" aria-label="Editor sections">
+            {tabs.map(([k, label, badge]) => (
+              <button key={k} role="tab" id={`ptab-${k}`} aria-selected={tab === k} aria-controls={`ppanel-${k}`} className="ptab" onClick={() => setTab(k)}>
+                {label}{badge && <span className="chip" style={{ marginLeft: 6, padding: '0 7px' }}>{badge}</span>}
+              </button>
+            ))}
+          </div>
+
+          <div role="tabpanel" id={`ppanel-${tab}`} aria-labelledby={`ptab-${tab}`} className="grid gap-4 ppanel" key={tab}>
+            {tab === 'edit' && (
+              <>
           <section className="card" aria-label="Trim">
             <h3 style={{ fontSize: 15 }}>Trim</h3>
             <p className="muted" style={{ margin: '4px 0 8px', fontSize: 13 }}>Cuts land in the pauses around whole words. Use [ and ] to set the start and end at the selected word.</p>
@@ -262,6 +298,25 @@ export function ClipEditor({ projectId, clipId, onBack }: { projectId: string; c
             </label>
           </section>
 
+              </>
+            )}
+            {tab === 'captions' && (
+              <>
+          <section className="card" aria-label="Captions">
+            <h3 style={{ fontSize: 15 }}>Captions</h3>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '8px 0' }} role="radiogroup" aria-label="Caption template">
+              {data.templates.map((t) => (
+                <button key={t} className="btn" role="radio" aria-checked={(edits.template ?? 'karaoke-pop') === t} data-testid={`tpl-${t}`} onClick={() => change({ template: t })}>{t.replace('-', ' ')}</button>
+              ))}
+            </div>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}><input type="checkbox" data-testid="captions-toggle" checked={edits.captions_enabled} onChange={(e) => change({ captions_enabled: e.target.checked })} /> Show captions (word by word)</label>
+            <p className="muted" style={{ margin: '0 0 8px', fontSize: 12 }}>Fix a caption: double-click a word in the transcript, or select it and press E. This changes the captions only, never the audio.</p>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="checkbox" checked={edits.hook_enabled} onChange={(e) => change({ hook_enabled: e.target.checked })} /> Show the hook at the start</label>
+          </section>
+              </>
+            )}
+            {tab === 'layout' && (
+              <>
           <section className="card" aria-label="Layout">
             <h3 style={{ fontSize: 15 }}>Layout per segment</h3>
             {data.layouts.length === 0 ? <p className="muted" style={{ margin: '6px 0 0' }}>Render once to plan the layouts, then override any segment here.</p> : (
@@ -282,18 +337,12 @@ export function ClipEditor({ projectId, clipId, onBack }: { projectId: string; c
             )}
           </section>
 
-          <PublishPanel projectId={projectId} clipId={clipId} rendered={!!data.files['out.mp4']} />
-
-          <section className="card" aria-label="Captions">
-            <h3 style={{ fontSize: 15 }}>Captions</h3>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '8px 0' }} role="radiogroup" aria-label="Caption template">
-              {data.templates.map((t) => (
-                <button key={t} className="btn" role="radio" aria-checked={(edits.template ?? 'karaoke-pop') === t} data-testid={`tpl-${t}`} onClick={() => change({ template: t })}>{t.replace('-', ' ')}</button>
-              ))}
-            </div>
-            <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}><input type="checkbox" data-testid="captions-toggle" checked={edits.captions_enabled} onChange={(e) => change({ captions_enabled: e.target.checked })} /> Show captions (word by word)</label>
-            <p className="muted" style={{ margin: '0 0 8px', fontSize: 12 }}>Fix a caption: double-click a word in the transcript, or select it and press E. This changes the captions only, never the audio.</p>
-            <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="checkbox" checked={edits.hook_enabled} onChange={(e) => change({ hook_enabled: e.target.checked })} /> Show the hook at the start</label>
+              </>
+            )}
+            {tab === 'publish' && (
+              <>
+              <section className="card" aria-label="Details">
+                <h3 style={{ fontSize: 15 }}>Title, hook and description</h3>
             <input className="field" style={{ marginTop: 8 }} aria-label="Hook text" value={edits.hook ?? c.hook} onChange={(e) => change({ hook: e.target.value })} />
             <textarea className="field" style={{ marginTop: 8 }} rows={2} aria-label="Description" value={edits.description ?? c.description} onChange={(e) => change({ description: e.target.value })} />
             <input className="field" style={{ marginTop: 8 }} aria-label="Hashtags" value={(edits.hashtags ?? c.hashtags).join(', ')} onChange={(e) => change({ hashtags: e.target.value.split(',').map((h) => h.trim().replace(/^#/, '')).filter(Boolean) })} />
@@ -305,7 +354,11 @@ export function ClipEditor({ projectId, clipId, onBack }: { projectId: string; c
               </label>
             )}
           </section>
-        </div>
+                <PublishPanel projectId={projectId} clipId={clipId} rendered={!!data.files['out.mp4']} />
+              </>
+            )}
+          </div>
+        </main>
       </div>
     </div>
   )
