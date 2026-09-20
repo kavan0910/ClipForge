@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import secrets
 import shutil
@@ -100,8 +101,11 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
         return response
 
     @app.exception_handler(ClipforgeError)
-    async def clipforge_error(_: Request, exc: ClipforgeError):
+    async def clipforge_error(request: Request, exc: ClipforgeError):
         status = 409 if isinstance(exc, OffsetMismatch) else 422
+        logging.getLogger("uvicorn.error").warning(
+            "%s %s -> %s: %s %s", request.method, request.url.path, status, exc.message, exc.action
+        )
         body: dict[str, Any] = dict(exc.to_dict())
         if isinstance(exc, OffsetMismatch):
             body["offset"] = exc.expected
