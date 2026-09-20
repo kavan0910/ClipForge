@@ -36,6 +36,7 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
   const [showLogs, setShowLogs] = useState(false)
   const [warnings, setWarnings] = useState<string[]>([])
   const [cost, setCost] = useState<CostState | null>(null)
+  const [stageCost, setStageCost] = useState<Record<string, number>>({})
   const [clips, setClips] = useState<ClipRow[]>([])
   const [steer, setSteer] = useState('')
   const unsub = useRef<() => void>(() => undefined)
@@ -56,6 +57,10 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
       (e: ProgressEvent) => {
         setLogs((l) => [...l.slice(-199), `${e.type} ${e.stage ?? ''} ${e.message ?? ''}`.trim()])
         if (e.type === 'source_ready' && e.warnings) setWarnings((w) => [...w, ...e.warnings!])
+        if (e.type === 'cost' && e.call_usd !== undefined) {
+          const k = e.stage ?? 'curate'
+          setStageCost((c) => ({ ...c, [k]: (c[k] ?? 0) + e.call_usd! }))
+        }
         if (e.type === 'cost' && e.usd !== undefined) {
           setCost({ usd: e.usd, cap_usd: e.cap_usd ?? 1, input_tokens: e.input_tokens ?? 0, output_tokens: e.output_tokens ?? 0, cache_read_tokens: e.cache_read_tokens ?? 0 })
         }
@@ -104,6 +109,11 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
   const finished = project.status === 'done' || (visible.length > 0 && doneCount === visible.length)
   const overall = finished ? 1 : Math.min((doneCount + activePct) / visible.length, 0.999)
   const pctText = `${Math.round(overall * 100)}%`
+  // Only the AI steps cost money; every other step runs on this computer. Unknown cost stages belong to clip selection.
+  const stepOf = (stage: string) => (STEPS.some((x) => x.key === (STAGE_ALIAS[stage] ?? stage)) ? (STAGE_ALIAS[stage] ?? stage) : 'curate')
+  const stepCost = (key: string) => Object.entries(stageCost).filter(([k]) => stepOf(k) === key).reduce((a, [, v]) => a + v, 0)
+  const breakdown = (key: string) => Object.entries(stageCost).filter(([k]) => stepOf(k) === key).map(([k, v]) => `${k}: ${fmtUsd(v)}`).join(' · ')
+  const fmtUsd = (v: number) => `$${v < 0.01 ? v.toFixed(4) : v.toFixed(2)}`
   const R = 54, C = 2 * Math.PI * R
   const headline =
     finished ? 'Ready to review'
@@ -160,6 +170,7 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
                   {state === 'done' ? '✓' : state === 'error' ? '!' : i + 1}
                 </span>
                 <span>{s.label}</span>
+                {stepCost(s.key) > 0 && <span title={breakdown(s.key)} style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>{fmtUsd(stepCost(s.key))}</span>}
                 {st?.done && <span className="muted" style={{ fontSize: 12 }}>{st.cached ? 'cached' : `${(st.seconds ?? 0).toFixed(1)} s`}</span>}
               </li>
             )

@@ -225,6 +225,7 @@ export async function abortUpload(id: string) {
 export interface ProgressEvent {
   type: string
   stage?: string
+  call_usd?: number
   pct?: number | null
   bytes?: number | null
   total?: number | null
