@@ -153,11 +153,16 @@ def _fit_assets(w: int, h: int, card_w: int, card_h: int, x0: int, y0: int, radi
     return _FIT_ASSETS[key]
 
 
-def _fit_blur(frame: np.ndarray, w: int, h: int) -> np.ndarray:
+def _fit_blur(frame: np.ndarray, w: int, h: int, rect: Rect | None = None) -> np.ndarray:
     """The whole frame as a rounded card with a soft shadow over its own blurred, dimmed background: nothing is
     cropped or enlarged, so the picture stays as sharp as the source."""
     import cv2
 
+    if rect is not None and (
+        rect.w < frame.shape[1] - 1 or rect.h < frame.shape[0] - 1
+    ):  # a punch-in: a slightly tighter view
+        x0c, y0c = round(rect.x), round(rect.y)
+        frame = frame[y0c : y0c + max(round(rect.h), 2), x0c : x0c + max(round(rect.w), 2)]
     fh, fw = frame.shape[:2]
     margin = round(w * 0.025)
     card_w = w - 2 * margin
@@ -213,7 +218,7 @@ def compose(frame: np.ndarray, spec: FrameSpec, w: int = OUT_W, h: int = OUT_H) 
             frame, (w, top_h), interpolation=cv2.INTER_AREA if fw > w else cv2.INTER_LANCZOS4
         )
         return np.vstack([screen, _warp(frame, spec.rects[1], w, h - top_h)])
-    return _fit_blur(frame, w, h)
+    return _fit_blur(frame, w, h, spec.rects[0] if spec.rects else None)
 
 
 def _ass_filter(ass: Path, fonts: Path | None) -> str:

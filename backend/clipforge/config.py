@@ -37,6 +37,9 @@ class Settings(BaseSettings):
         default="fit", alias="DEFAULT_LAYOUT"
     )  # fit = whole frame, blurred sides
     render_denoise: Literal["auto", "off"] = Field(default="auto", alias="RENDER_DENOISE")
+    render_punch_in: Literal["auto", "off"] = Field(
+        default="auto", alias="RENDER_PUNCH_IN"
+    )  # small pushes on emphasis (fit layout)
     max_source_height: int = Field(default=2160, alias="MAX_SOURCE_HEIGHT", ge=360, le=2160)
     ytdlp_cookies_from_browser: str | None = Field(default=None, alias="YTDLP_COOKIES_FROM_BROWSER")
     google_client_id: str | None = Field(default=None, alias="GOOGLE_CLIENT_ID")

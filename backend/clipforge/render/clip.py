@@ -26,6 +26,7 @@ from clipforge.pipeline import Reporter, rms_db_frames
 from clipforge.procs import CancelToken, run_streaming
 from clipforge.reframe import camera as cam_mod
 from clipforge.reframe import plan as rplan
+from clipforge.reframe import punch
 from clipforge.reframe.camera import Rect, crop_size
 from clipforge.reframe.solve import OUT_H, OUT_W, Solved, solve
 from clipforge.render import audio as raudio
@@ -164,6 +165,18 @@ def render_clip(
         "x_frac": np.round(solved.x_frac, 5).tolist(),
     }))  # fmt: skip
     scale_solved(solved, video.width / analysis["width"], video.height / analysis["height"])
+    if get_settings().render_punch_in == "auto" and any(
+        f.layout == "fit_blur" for f in solved.frames
+    ):
+        emph = set(clip.emphasis_word_indices)
+        beats = [w.out_start for w in edl.remap_words(transcript.words) if w.i in emph]
+        takes = [(sg.out_in, sg.out_out) for sg in edl.segments]
+        centres = [
+            float(np.nanmedian(tr.cx)) / scene.width for tr in rplan.significant_tracks(scene)
+        ]
+        focus = float(np.median(centres)) if centres else 0.5
+        curve = punch.zoom_curve(len(solved.frames), fps, beats, takes)
+        punch.apply_fit_punch(solved.frames, curve, video.width, video.height, focus)
 
     # 4. Audio: EDL joins with fades, then two-pass loudness normalisation
     report("render", 0.2, note="mixing audio")

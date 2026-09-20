@@ -274,3 +274,22 @@ def test_merge_chunks_keeps_chunks_that_do_not_overlap():
         index=1, start=240, end=371, language="en", words=[w(245), w(300)]
     )  # a gap (skipped section) between
     assert [x.start for x in merge_chunks([a, b])] == [1, 100, 245, 300]
+
+
+def test_punch_curve_shape():
+    from clipforge.reframe.punch import MIN_GAP, PEAK, apply_fit_punch, zoom_curve
+    from clipforge.reframe.solve import FrameSpec
+
+    fps = 30.0
+    z = zoom_curve(300, fps, [2.0, 2.5, 6.0])  # the 2.5 s beat is too close to the first: skipped
+    assert z.min() >= 1.0 and z.max() <= PEAK + 1e-6
+    assert (
+        z[int(1.9 * fps)] == 1.0 and z[int(2.5 * fps)] > 1.05
+    )  # in at the beat, near the peak shortly after
+    assert z[int(2.6 * fps)] > z[int(4.4 * fps)]  # decays slowly afterwards
+    assert MIN_GAP > 0.5 and z[int(6.4 * fps)] > 1.05  # the later beat still fires
+    drift = zoom_curve(300, fps, [], [(0.0, 10.0)])
+    assert drift[0] < drift[150] < drift[299] <= 1.036
+    frames = [FrameSpec("fit_blur") for _ in range(300)] + [FrameSpec("single")]
+    moved = apply_fit_punch(frames, np.concatenate([z, [1.0]]), 1920, 1080, 0.5)
+    assert moved > 20 and frames[int(2.5 * fps)].rects[0].w < 1920 and not frames[-1].rects
