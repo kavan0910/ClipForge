@@ -150,6 +150,10 @@ def render_clip(
     plan = rplan.build_plan(
         scene, shots, turns, cw, overrides=clipedits.layout_overrides(edits), fit=fit
     )
+    if captions is not None and plan and all(seg.layout == "fit_blur" for seg in plan):
+        captions = replace(
+            captions, anchor_y=0.735
+        )  # captions sit below the picture card, not over it
     solved = solve(
         scene, plan, edl, fps, punch_in=punch_in, max_zoom=cam_mod.max_zoom_for(video.height)
     )
@@ -211,12 +215,16 @@ def render_clip(
         )
         upscaler = sr.Upscaler()
     meas_upscale = "ai" if upscaler else "lanczos+sharpen"
+    # Low-bitrate sources carry blocky compression noise that a second encode would only amplify: clean it lightly.
+    bits = video.bit_rate or (Path(master).stat().st_size * 8 / max(source.probe.duration, 1.0))
+    bpp = bits / max(video.width * video.height * fps, 1.0)
+    denoise = get_settings().render_denoise == "auto" and bpp < 0.09
     try:
         rvideo.render_video(master, video, edl, solved, final_audio, out, fast, tonemap_ok,
                         lambda p: report("render", 0.25 + 0.7 * p), cancel, overlay=overlay,
                         ass_path=cap_res.ass_path if cap_res else None, fonts_dir=capstage.FONTS_DIR,
                         layers=cap_res.layers if cap_res else None, head=head, tail=tail,
-                        preview=d / "base_preview.mp4", upscaler=upscaler)  # fmt: skip
+                        preview=d / "base_preview.mp4", upscaler=upscaler, denoise=denoise)  # fmt: skip
     finally:
         if upscaler:
             upscaler.close()
@@ -237,7 +245,12 @@ def render_clip(
     meas = rmeasure.measure_clip(out, solved, edl, check_faces, offset_frames=len(head))
     meas["render_seconds"] = round(time.time() - t_start, 1)
     meas["clip_seconds"] = round(edl.duration, 2)
-    meas["upscale"] = {"method": meas_upscale, "enlargement": round(factor, 2)}
+    meas["upscale"] = {
+        "method": meas_upscale,
+        "enlargement": round(factor, 2),
+        "denoise": denoise,
+        "bits_per_pixel": round(bpp, 3),
+    }
     meas["encoder"] = "h264_videotoolbox" if fast else "libx264 slow crf15"
     (d / "measure.json").write_text(json.dumps(meas, indent=1))
     rmeta.write_metadata(

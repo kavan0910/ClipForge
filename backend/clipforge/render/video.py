@@ -34,10 +34,12 @@ def fps_arg(fps: float) -> str:
     return str(f.numerator) if f.denominator == 1 else f"{f.numerator}/{f.denominator}"
 
 
-def decode_filter(video: VideoInfo, fps: float, tonemap_ok: bool) -> str:
+def decode_filter(video: VideoInfo, fps: float, tonemap_ok: bool, denoise: bool = False) -> str:
     parts = []
     if video.hdr and tonemap_ok:
         parts.append(HDR_CHAIN)
+    if denoise:  # light spatial/temporal denoise: removes the blocky, mosquito-noise look of low-bitrate sources
+        parts.append("hqdn3d=1.4:1.2:4:4")
     parts.append(f"fps={fps_arg(fps)}")
     matrix = "bt709" if (video.height >= 720 or video.hdr) else "bt601"
     parts.append(f"scale=in_range=tv:in_color_matrix={matrix},format=bgr24")
@@ -45,12 +47,18 @@ def decode_filter(video: VideoInfo, fps: float, tonemap_ok: bool) -> str:
 
 
 def decode_segment(
-    master: Path, video: VideoInfo, start: float, n_frames: int, fps: float, tonemap_ok: bool
+    master: Path,
+    video: VideoInfo,
+    start: float,
+    n_frames: int,
+    fps: float,
+    tonemap_ok: bool,
+    denoise: bool = False,
 ) -> Iterator[np.ndarray]:
     """Yield exactly `n_frames` BGR frames starting at source time `start` (frame-accurate seek)."""
     frame_bytes = video.width * video.height * 3
     argv = ["ffmpeg", "-nostdin", "-v", "error", "-ss", f"{start:.6f}", "-i", str(master), "-map", "0:v:0",
-            "-frames:v", str(n_frames), "-vf", decode_filter(video, fps, tonemap_ok), "-f", "rawvideo", "-"]  # fmt: skip
+            "-frames:v", str(n_frames), "-vf", decode_filter(video, fps, tonemap_ok, denoise), "-f", "rawvideo", "-"]  # fmt: skip
     proc = subprocess.Popen(
         argv, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True
     )
@@ -116,26 +124,75 @@ def sharpen_for_upscale(img: np.ndarray, scale: float) -> np.ndarray:
     return cv2.addWeighted(img, 1.0 + amount, blur, -amount, 0)
 
 
+_FIT_ASSETS: dict[tuple, dict] = {}
+
+
+def _fit_assets(w: int, h: int, card_w: int, card_h: int, x0: int, y0: int, radius: int) -> dict:
+    """Static pieces of the fit layout, built once: rounded-corner mask, soft drop shadow, vignette."""
+    import cv2
+
+    key = (w, h, card_w, card_h, x0, y0, radius)
+    if key in _FIT_ASSETS:
+        return _FIT_ASSETS[key]
+    yy, xx = np.mgrid[0:card_h, 0:card_w].astype(np.float32)
+    dx = np.maximum(np.maximum(radius - xx, xx - (card_w - 1 - radius)), 0)
+    dy = np.maximum(np.maximum(radius - yy, yy - (card_h - 1 - radius)), 0)
+    mask = np.clip(radius - np.sqrt(dx * dx + dy * dy) + 0.5, 0, 1)[
+        ..., None
+    ]  # antialiased rounded rectangle
+    sh = np.zeros((h, w), np.float32)
+    sh[y0 + 14 : y0 + 14 + card_h, x0 : x0 + card_w] = 1.0
+    sh = cv2.GaussianBlur(sh, (0, 0), 26)
+    ys, xs = np.mgrid[0:h, 0:w].astype(np.float32)
+    r2 = ((xs - w / 2) / (w / 2)) ** 2 + ((ys - h / 2) / (h / 2)) ** 2
+    vignette = 1.0 - 0.22 * np.clip(r2 / 2, 0, 1)
+    dim = np.clip(0.60 * vignette * (1.0 - 0.55 * sh), 0, 1)
+    dim_u8 = np.repeat((dim * 255 + 0.5).astype(np.uint8)[..., None], 3, axis=2)
+    _FIT_ASSETS.clear()
+    _FIT_ASSETS[key] = {"mask": mask.astype(np.float32), "dim": dim_u8}
+    return _FIT_ASSETS[key]
+
+
 def _fit_blur(frame: np.ndarray, w: int, h: int) -> np.ndarray:
+    """The whole frame as a rounded card with a soft shadow over its own blurred, dimmed background: nothing is
+    cropped or enlarged, so the picture stays as sharp as the source."""
     import cv2
 
     fh, fw = frame.shape[:2]
+    margin = round(w * 0.025)
+    card_w = w - 2 * margin
+    card_h = round(card_w * fh / fw)
+    if card_h > h * 0.92:  # a portrait source: let it fill the frame instead
+        margin, card_w, card_h = 0, w, min(round(w * fh / fw), h)
+    x0, y0 = margin, (h - card_h) // 2
     s_cover = h / fh
     bw = round(fw * s_cover)
-    small = cv2.resize(frame, (max(bw // 8, 1), max(h // 8, 1)), interpolation=cv2.INTER_AREA)
-    small = cv2.GaussianBlur(small, (0, 0), 6)
-    bg = cv2.resize(small, (bw, h), interpolation=cv2.INTER_LINEAR)
-    x0 = (bw - w) // 2
-    bg = (bg[:, max(x0, 0) : max(x0, 0) + w].astype(np.float32) * 0.45).astype(np.uint8)
+    small = cv2.resize(
+        frame, (max(bw // 28, 1), max(h // 28, 1)), interpolation=cv2.INTER_AREA
+    )  # a soft colour wash
+    small = cv2.GaussianBlur(small, (0, 0), 2)
+    bg = cv2.resize(small, (bw, h), interpolation=cv2.INTER_CUBIC)
+    bx = max((bw - w) // 2, 0)
+    bg = bg[:, bx : bx + w]
     if bg.shape[1] != w:
         bg = cv2.resize(bg, (w, h))
-    fit_h = round(w * fh / fw)
     fg = cv2.resize(
-        frame, (w, fit_h), interpolation=cv2.INTER_AREA if fw > w else cv2.INTER_LANCZOS4
+        frame, (card_w, card_h), interpolation=cv2.INTER_AREA if fw > card_w else cv2.INTER_LANCZOS4
     )
-    y0 = (h - fit_h) // 2
-    bg[y0 : y0 + fit_h] = fg
-    return bg
+    fg = cv2.addWeighted(
+        fg, 1.22, cv2.GaussianBlur(fg, (0, 0), 0.9), -0.22, 0
+    )  # keep fine detail after shrinking
+    if margin == 0:
+        out = cv2.multiply(bg, _fit_assets(w, h, card_w, card_h, x0, y0, 0)["dim"], scale=1 / 255)
+        out[y0 : y0 + card_h, x0 : x0 + card_w] = fg
+        return out
+    assets = _fit_assets(w, h, card_w, card_h, x0, y0, round(w * 0.028))
+    out = cv2.multiply(bg, assets["dim"], scale=1 / 255)
+    region = out[y0 : y0 + card_h, x0 : x0 + card_w].astype(np.float32)
+    out[y0 : y0 + card_h, x0 : x0 + card_w] = (
+        fg * assets["mask"] + region * (1.0 - assets["mask"])
+    ).astype(np.uint8)
+    return out
 
 
 def compose(frame: np.ndarray, spec: FrameSpec, w: int = OUT_W, h: int = OUT_H) -> np.ndarray:
@@ -182,7 +239,7 @@ def encode_argv(
         ["-c:v", "h264_videotoolbox", "-q:v", "65", "-profile:v", "high", "-allow_sw", "1"]
         if fast
         else ["-c:v", "libx264", "-profile:v", "high", "-preset", "slow", "-crf", "15",
-              "-x264-params", "colorprim=bt709:transfer=bt709:colmatrix=bt709:fullrange=off"]
+              "-x264-params", "colorprim=bt709:transfer=bt709:colmatrix=bt709:fullrange=off:aq-mode=3:aq-strength=0.9:deblock=-1,-1"]
     )  # fmt: skip
     argv = ["ffmpeg", "-nostdin", "-v", "error", "-y",
             "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{w}x{h}", "-r", fps_arg(fps), "-i", "-",
@@ -230,7 +287,7 @@ def render_video(
     overlay: Callable[[np.ndarray, int], np.ndarray] | None = None, codec_args: list[str] | None = None,
     ass_path: Path | None = None, fonts_dir: Path | None = None,
     layers: list[tuple[Path, int]] | None = None, head: list[np.ndarray] | None = None,
-    tail: list[np.ndarray] | None = None, preview: Path | None = None, upscaler=None,
+    tail: list[np.ndarray] | None = None, preview: Path | None = None, upscaler=None, denoise: bool = False,
 ) -> None:  # fmt: skip
     """Decode each kept segment, compose every output frame, pipe into one encode."""
     global _UPSCALER
@@ -264,7 +321,7 @@ def render_video(
             f0 = round(seg.out_in * fps)
             f1 = min(round(seg.out_out * fps), body)
             for i, frame in enumerate(
-                decode_segment(master, video, seg.src_in, f1 - f0, fps, tonemap_ok)
+                decode_segment(master, video, seg.src_in, f1 - f0, fps, tonemap_ok, denoise)
             ):
                 if cancel and cancel.cancelled:
                     raise Cancelled

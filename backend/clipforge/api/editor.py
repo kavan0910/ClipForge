@@ -141,6 +141,9 @@ def register(
             eff = clipedits.effective_clip(clip, e)
             edl = clipedits.build_edl(eff, tr.words, e, rms(p), src.probe.duration)
             tpl = load_template(template or e.template or "karaoke-pop")
+            fit = (e.framing or get_settings().default_layout) == "fit" and not e.layouts
+            if fit:  # the render puts captions below the picture card; the preview must match
+                tpl = tpl.model_copy(update={"anchor": tpl.anchor.model_copy(update={"y": 0.735})})
             tl = build_timeline(
                 edl.remap_words(clipedits.apply_caption_text(tr.words, e))
                 if e.captions_enabled

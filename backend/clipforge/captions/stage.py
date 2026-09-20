@@ -26,6 +26,7 @@ class CaptionOptions:
     renderer: str = "auto"  # auto | remotion | ass
     hook: bool = True
     words: bool = True  # False: no word-by-word captions (the hook may still show)
+    anchor_y: float | None = None  # move the caption block (fit layout: below the picture card)
     strip_punctuation: bool = False
     mask_profanity: bool = False
     overrides: dict = field(default_factory=dict)  # template token overrides (brand kit)
@@ -53,6 +54,8 @@ def prepare(
     wav: Path | None = None,
 ) -> CaptionResult:  # fmt: skip
     tpl = apply_kit(load_template(opts.template), brand)
+    if opts.anchor_y is not None:
+        tpl = tpl.model_copy(update={"anchor": tpl.anchor.model_copy(update={"y": opts.anchor_y})})
     update = {"strip_punctuation": opts.strip_punctuation or tpl.strip_punctuation,
               "mask_profanity": opts.mask_profanity or tpl.mask_profanity, }  # fmt: skip
     tpl = tpl.model_copy(update=update)
