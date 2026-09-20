@@ -8,6 +8,9 @@ Anthropic API for the editorial step (Phase 2), and the UI says so.
 
 ## Setup
 
+**Fastest:** double-click `install_and_run.command` (or run `./install_and_run.command`). It installs everything, asks for your keys, and opens the app.
+Manual steps:
+
 ```
 make setup      # installs uv, deno and ffmpeg-full (Homebrew), Python deps, web + captions deps, builds the UI
 cp .env.example .env   # then add ANTHROPIC_API_KEY (needed from Phase 2)
