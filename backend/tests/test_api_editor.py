@@ -179,7 +179,7 @@ def test_project_list_shows_the_real_title(tmp_path):
     from clipforge.api.app import create_app
     from clipforge.config import Settings
 
-    settings = Settings(DATA_DIR=str(tmp_path))  # pyright: ignore[reportCallIssue]
+    settings = Settings(DATA_DIR=tmp_path)  # pyright: ignore[reportCallIssue]
     app = create_app(settings, token="t")
     d = tmp_path / "projects" / "abc12345"
     (d / "source").mkdir(parents=True)

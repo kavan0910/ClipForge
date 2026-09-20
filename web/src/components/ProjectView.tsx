@@ -40,6 +40,7 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
   const [clips, setClips] = useState<ClipRow[]>([])
   const [steer, setSteer] = useState('')
   const unsub = useRef<() => void>(() => undefined)
+  const [actionError, setActionError] = useState('')
 
   const refresh = useCallback(
     () =>
@@ -94,6 +95,11 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
     return () => unsub.current()
   }, [refresh, listen])
 
+  const recurate = (body: { mode: string; reference_clip_id?: string; steering?: string }) => {
+    setActionError('')
+    return api.recurate(id, body).then(() => { void refresh(); listen() }).catch((e: { message?: string; action?: string }) => setActionError([e.message, e.action].filter(Boolean).join(' ')))
+  }
+
   if (!project) return <div className="grid gap-4" aria-busy="true"><div className="skeleton" style={{ height: 56 }} /><div className="skeleton" style={{ height: 260 }} /><div className="skeleton" style={{ height: 120 }} /></div>
   const running = project.status === 'running'
   const activeIndex = STEPS.findIndex((s) => !steps[s.key]?.done)
@@ -135,6 +141,8 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
         <span className="muted" style={{ fontSize: 13 }}>Project</span>
         <span className="mono" style={{ fontSize: 13 }} data-testid="status">{project.status}</span>
       </div>
+
+      {actionError && <div className="alert" role="alert" data-testid="action-error"><strong>{actionError}</strong></div>}
 
       {project.status === 'error' && project.error && (
         <div className="alert" role="alert">
@@ -208,7 +216,7 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
         <div className="alert" role="alert" data-testid="curation-error">
           <strong>Clip selection did not run: {project.curation_error.message}</strong>
           {project.curation_error.action && <p style={{ margin: '4px 0 0' }}>{project.curation_error.action}</p>}
-          <button className="btn" style={{ marginTop: 8 }} onClick={() => api.recurate(id, { mode: 'fresh' }).then(() => { void refresh(); listen() })}>
+          <button className="btn" style={{ marginTop: 8 }} onClick={() => recurate({ mode: 'fresh' })}>
             Retry clip selection
           </button>
         </div>
@@ -228,13 +236,13 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
         <section aria-label="Clips" className="grid gap-3">
           <h3 style={{ fontSize: 16 }} data-testid="clips-ready">{clips.length} clips proposed</h3>
           {clips.map((c) => (
-            <ClipCard key={c.id} clip={c} onOpen={(cid) => { window.location.hash = `#/p/${id}/c/${cid}` }} onDecide={(cid, status) => void api.editor(id, cid).then((d) => api.saveEdits(id, cid, { ...d.edits, status })).then(refresh)} onMoreLike={(cid) => api.recurate(id, { mode: 'more_like', reference_clip_id: cid }).then(() => { void refresh(); listen() })} />
+            <ClipCard key={c.id} clip={c} onOpen={(cid) => { window.location.hash = `#/p/${id}/c/${cid}` }} onDecide={(cid, status) => void api.editor(id, cid).then((d) => api.saveEdits(id, cid, { ...d.edits, status })).then(refresh)} onMoreLike={(cid) => recurate({ mode: 'more_like', reference_clip_id: cid })} />
           ))}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn" onClick={() => api.recurate(id, { mode: 'shorter' }).then(() => { void refresh(); listen() })}>Shorter</button>
-            <button className="btn" onClick={() => api.recurate(id, { mode: 'different_topic' }).then(() => { void refresh(); listen() })}>Different topic</button>
+            <button className="btn" onClick={() => recurate({ mode: 'shorter' })}>Shorter</button>
+            <button className="btn" onClick={() => recurate({ mode: 'different_topic' })}>Different topic</button>
             <input className="field" style={{ flex: 1, minWidth: 200 }} placeholder="Steer: e.g. find the funniest moments" aria-label="Steering text" value={steer} onChange={(e) => setSteer(e.target.value)} />
-            <button className="btn" disabled={!steer.trim()} onClick={() => api.recurate(id, { mode: 'fresh', steering: steer }).then(() => { void refresh(); listen() })}>Re-curate</button>
+            <button className="btn" disabled={!steer.trim()} onClick={() => recurate({ mode: 'fresh', steering: steer })}>Re-curate</button>
           </div>
         </section>
       )}

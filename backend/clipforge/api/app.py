@@ -290,9 +290,11 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
     @app.post("/api/projects/{project_id}/recurate")
     async def recurate(project_id: str, req: Recurate) -> dict[str, Any]:
         p = open_project(project_id)
-        if not settings.anthropic_api_key:
+        if (
+            not get_settings().anthropic_api_key
+        ):  # read live: a key added in Settings applies without a restart
             raise ClipforgeError(
-                "No Anthropic API key is configured.", "Add ANTHROPIC_API_KEY to .env."
+                "No Anthropic API key is configured.", "Add ANTHROPIC_API_KEY in Settings."
             )
         spec = json.loads(p.path("job.json").read_text())
         spec["recurate"] = req.model_dump()
