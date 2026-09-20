@@ -284,6 +284,7 @@ def register(
                 "MAX_JOB_COST_USD": str(s.max_job_cost_usd),
                 "ASR_BACKEND": s.asr_backend,
                 "ASR_MODEL": s.asr_model,
+                "ASR_MODEL_NON_ENGLISH": s.asr_model_non_english,
                 "MAX_SOURCE_HEIGHT": str(s.max_source_height),
                 "YTDLP_COOKIES_FROM_BROWSER": s.ytdlp_cookies_from_browser or "",
                 "RENDER_WORKERS": str(s.render_workers or ""),

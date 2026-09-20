@@ -195,6 +195,40 @@ def rms_db_frames(wav_path: Path, hop: float = GUARD_HOP) -> list[float]:
     return out
 
 
+def is_english(lang: str | None) -> bool:
+    return lang is None or lang.lower().split("-")[0] == "en"
+
+
+def pick_model(settings: Settings, lang: str | None) -> str:
+    """Fast model for English; the accurate multilingual model for everything else (turbo is measurably worse there)."""
+    other = settings.asr_model_non_english
+    return settings.asr_model if is_english(lang) or other == "same" else other
+
+
+def detect_language(
+    project: Project, wav: Path, duration: float, backend: str, model: str, cancel: CancelToken
+) -> str | None:
+    """Language of the recording from a 30 s sample (cached per project). None if it cannot be told."""
+    cache = project.path("transcript", "language.json")
+    if cache.exists():
+        return json.loads(cache.read_text()).get("language")
+    start = max(min(duration * 0.3, duration - 30.0), 0.0)
+    cfg = {"backend": backend, "model": model, "wav": str(wav),
+           "detect": {"start": start, "end": min(start + 30.0, duration)}}  # fmt: skip
+    cfg_path = project.path("transcript", "detect.json")
+    cfg_path.write_text(json.dumps(cfg))
+    found: list[str] = []
+    code, _ = run_streaming(
+        [sys.executable, "-m", "clipforge.asr.worker", "--config", str(cfg_path)],
+        lambda line: found.append(line.split("|", 1)[1]) if line.startswith("CFLANG|") else None,
+        cancel,
+        {**os.environ, "PYTHONUNBUFFERED": "1", "TOKENIZERS_PARALLELISM": "false"},
+    )
+    lang = found[0] if code == 0 and found else None
+    cache.write_text(json.dumps({"language": lang}))
+    return lang
+
+
 def transcribe(
     project: Project,
     source: Source,
@@ -207,8 +241,19 @@ def transcribe(
 ) -> Transcript:
     """Chunked, resumable ASR with guards, sentence segmentation and optional diarization."""
     backend = default_asr_backend(settings)
-    model = settings.asr_model
     wav = Path(source.audio_path or "")
+    model = settings.asr_model
+    if settings.asr_model_non_english not in ("same", settings.asr_model):
+        lang_hint = language or detect_language(
+            project, wav, source.probe.duration, backend, model, cancel
+        )
+        model = pick_model(settings, lang_hint)
+        if model != settings.asr_model:
+            reporter.progress(
+                "transcribe",
+                0.0,
+                note=f"Detected language '{lang_hint}': using {model} for accuracy",
+            )
     prompt = build_initial_prompt(
         source.platform.title or source.title, source.platform.channel, source.platform.tags,
         source.platform.description, brand_vocabulary or [],

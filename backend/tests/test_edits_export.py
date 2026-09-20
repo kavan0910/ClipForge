@@ -207,3 +207,15 @@ def test_bundle_to_folder_and_zip(tmp_path):
 
     assert sorted(zipfile.ZipFile(z).namelist()) == ["clip-1/a.mp4", "clip-1/a.srt"]
     assert np.isfinite(1.0)
+
+
+def test_model_rule_by_language():
+    from clipforge.config import Settings
+    from clipforge.pipeline import is_english, pick_model
+
+    s = Settings(ASR_MODEL="large-v3-turbo", ASR_MODEL_NON_ENGLISH="large-v3")  # pyright: ignore[reportCallIssue]
+    assert pick_model(s, "en") == "large-v3-turbo" and pick_model(s, None) == "large-v3-turbo"
+    assert pick_model(s, "hi") == "large-v3" and pick_model(s, "es") == "large-v3"
+    assert is_english("en-US") and not is_english("hi")
+    same = Settings(ASR_MODEL="large-v3-turbo", ASR_MODEL_NON_ENGLISH="same")  # pyright: ignore[reportCallIssue]
+    assert pick_model(same, "hi") == "large-v3-turbo"
