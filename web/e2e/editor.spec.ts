@@ -32,6 +32,7 @@ test('keyboard-only: open a clip, cut a phrase, approve, render, export', async 
   await expect(page.getByTestId('clip-status')).toHaveText('approved')
 
   // Render and wait for it.
+  await page.getByRole('combobox', { name: 'Render quality' }).selectOption('off')  // the AI upscale is too slow for a test
   await page.getByTestId('render').focus()
   await page.keyboard.press('Enter')
   await expect(page.getByTestId('render')).toHaveText(/Rendering/)

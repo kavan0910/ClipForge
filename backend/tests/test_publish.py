@@ -223,3 +223,21 @@ def test_face_models_download_and_extract(tmp_path: Path):
         ).exists()
         models.ensure_face_models(tmp_path, fake)  # present: nothing is fetched again
         assert len(calls) == 2
+
+
+def test_env_migration_and_enlargement(tmp_path):
+    from clipforge import settings_store
+    from clipforge.reframe.camera import Rect
+    from clipforge.reframe.solve import FrameSpec
+    from clipforge.render.sr import enlargement
+
+    env = tmp_path / ".env"
+    env.write_text("A=1\nMAX_SOURCE_HEIGHT=1080\n")
+    assert settings_store.migrate_env(env) is True
+    assert "MAX_SOURCE_HEIGHT=2160" in env.read_text()
+    assert settings_store.migrate_env(env) is False  # once only
+    env.write_text("MAX_SOURCE_HEIGHT=1440\n")
+    assert settings_store.migrate_env(env) is False  # a deliberate choice is left alone
+    frames = [FrameSpec("single", [Rect(0, 0, 608, 1080)]) for _ in range(5)]
+    assert abs(enlargement(frames) - 1920 / 1080) < 1e-6
+    assert enlargement([FrameSpec("single", [Rect(0, 0, 1215, 2160)])]) < 1.0

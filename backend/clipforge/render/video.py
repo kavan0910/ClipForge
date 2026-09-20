@@ -74,6 +74,11 @@ def decode_segment(
         proc.wait()
 
 
+_UPSCALER = None  # set by render_video for the duration of one render (one render per process)
+AI_MIN_SCALE = 1.25
+AI_BLEND = 0.7  # share of the AI-upscaled picture in the result
+
+
 def _warp(frame: np.ndarray, r: Rect, w: int, h: int) -> np.ndarray:
     """Crop `r` (whole source pixels) and resize with Lanczos.
 
@@ -86,7 +91,16 @@ def _warp(frame: np.ndarray, r: Rect, w: int, h: int) -> np.ndarray:
     fh, fw = frame.shape[:2]
     cw, ch = min(max(round(r.w), 2), fw), min(max(round(r.h), 2), fh)
     x0, y0 = min(max(round(r.x), 0), fw - cw), min(max(round(r.y), 0), fh - ch)
-    out = cv2.resize(frame[y0 : y0 + ch, x0 : x0 + cw], (w, h), interpolation=cv2.INTER_LANCZOS4)
+    crop = frame[y0 : y0 + ch, x0 : x0 + cw]
+    if _UPSCALER is not None and h / ch >= AI_MIN_SCALE:
+        # The model gives crisp, deblocked edges but smooths skin a little; blending back some of the
+        # conventionally scaled picture keeps natural texture.
+        ai = _UPSCALER.upscale(crop, w, h)
+        plain = sharpen_for_upscale(
+            cv2.resize(crop, (w, h), interpolation=cv2.INTER_LANCZOS4), h / ch
+        )
+        return cv2.addWeighted(ai, AI_BLEND, plain, 1.0 - AI_BLEND, 0)
+    out = cv2.resize(crop, (w, h), interpolation=cv2.INTER_LANCZOS4)
     return sharpen_for_upscale(out, h / ch)
 
 
@@ -216,9 +230,11 @@ def render_video(
     overlay: Callable[[np.ndarray, int], np.ndarray] | None = None, codec_args: list[str] | None = None,
     ass_path: Path | None = None, fonts_dir: Path | None = None,
     layers: list[tuple[Path, int]] | None = None, head: list[np.ndarray] | None = None,
-    tail: list[np.ndarray] | None = None, preview: Path | None = None,
+    tail: list[np.ndarray] | None = None, preview: Path | None = None, upscaler=None,
 ) -> None:  # fmt: skip
     """Decode each kept segment, compose every output frame, pipe into one encode."""
+    global _UPSCALER
+    _UPSCALER = upscaler
     fps = solved.fps
     head, tail = head or [], tail or []
     body = len(solved.frames)
@@ -272,6 +288,7 @@ def render_video(
         err = proc.stderr.read().decode(errors="replace") if proc.stderr else ""
         raise MediaError("The encoder stopped early.", err[-300:]) from None
     finally:
+        _UPSCALER = None
         if proc.poll() is None:
             kill_tree(proc, 2.0)
     out.with_suffix(".partial.mp4").replace(out)

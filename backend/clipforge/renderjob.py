@@ -54,7 +54,7 @@ def run(project: Project, clip_id: str) -> int:
             )
         )
         res = render_clip(project, source, tr, clip, opts.get("cleanup", "light"), bool(opts.get("fast")), False, reporter, cancel,
-                          bool(opts.get("check_faces", False)), cuts, float(opts.get("punch_in", 1.0)), caps, kit)  # fmt: skip
+                          bool(opts.get("check_faces", False)), cuts, float(opts.get("punch_in", 1.0)), caps, kit, None, opts.get("upscale"))  # fmt: skip
         project.emit("render_done", clip=clip_id, seconds=round(res.seconds, 1), path=str(res.path))
         return 0
     except Cancelled:

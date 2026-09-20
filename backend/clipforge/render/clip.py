@@ -17,6 +17,7 @@ from clipforge.brand import BrandKit
 from clipforge.captions import stage as capstage
 from clipforge.captions.stage import CaptionOptions
 from clipforge.cleanup import Level
+from clipforge.config import get_settings
 from clipforge.curate.schema import Clip
 from clipforge.edl import EDL
 from clipforge.errors import ClipforgeError, MediaError
@@ -29,6 +30,7 @@ from clipforge.reframe.camera import Rect, crop_size
 from clipforge.reframe.solve import OUT_H, OUT_W, Solved, solve
 from clipforge.render import audio as raudio
 from clipforge.render import measure as rmeasure
+from clipforge.render import sr
 from clipforge.render import video as rvideo
 from clipforge.store import Project
 
@@ -79,7 +81,7 @@ def render_clip(
     project: Project, source: Source, transcript: Transcript, clip: Clip, level: Level = "light", fast: bool = False,
     debug: bool = False, reporter: Reporter | None = None, cancel: CancelToken | None = None, check_faces: bool = True,
     scene_cuts: list[float] | None = None, punch_in: float = 1.0, captions: CaptionOptions | None = None,
-    brand: BrandKit | None = None, brand_root: Path | None = None,
+    brand: BrandKit | None = None, brand_root: Path | None = None, upscale: str | None = None,
 ) -> RenderResult:  # fmt: skip
     """Full Phase 3 render for one clip; writes clips/<id>/{edl,analysis,reframe,measure}.json + out.mp4."""
     t_start = time.time()
@@ -195,11 +197,26 @@ def render_clip(
     # 6. One video encode
     out = d / "out.mp4"
     report("render", 0.25, note="rendering video")
-    rvideo.render_video(master, video, edl, solved, final_audio, out, fast, tonemap_ok,
+    upscaler = None
+    mode = upscale or get_settings().render_upscale
+    factor = sr.enlargement(solved.frames)
+    if mode != "off" and factor >= rvideo.AI_MIN_SCALE and sr.available_device():
+        report(
+            "render",
+            0.24,
+            note=f"AI upscaling (crops are enlarged {factor:.1f}x): this is slow but much sharper",
+        )
+        upscaler = sr.Upscaler()
+    meas_upscale = "ai" if upscaler else "lanczos+sharpen"
+    try:
+        rvideo.render_video(master, video, edl, solved, final_audio, out, fast, tonemap_ok,
                         lambda p: report("render", 0.25 + 0.7 * p), cancel, overlay=overlay,
                         ass_path=cap_res.ass_path if cap_res else None, fonts_dir=capstage.FONTS_DIR,
                         layers=cap_res.layers if cap_res else None, head=head, tail=tail,
-                        preview=d / "base_preview.mp4")  # fmt: skip
+                        preview=d / "base_preview.mp4", upscaler=upscaler)  # fmt: skip
+    finally:
+        if upscaler:
+            upscaler.close()
     thumb_info = None
     if cap_res is not None or True:
         from clipforge.render import metadata as rmeta
@@ -217,6 +234,7 @@ def render_clip(
     meas = rmeasure.measure_clip(out, solved, edl, check_faces, offset_frames=len(head))
     meas["render_seconds"] = round(time.time() - t_start, 1)
     meas["clip_seconds"] = round(edl.duration, 2)
+    meas["upscale"] = {"method": meas_upscale, "enlargement": round(factor, 2)}
     meas["encoder"] = "h264_videotoolbox" if fast else "libx264 slow crf15"
     (d / "measure.json").write_text(json.dumps(meas, indent=1))
     rmeta.write_metadata(

@@ -68,7 +68,11 @@ class UploadCreate(BaseModel):
 
 
 def create_app(settings: Settings | None = None, token: str | None = None) -> FastAPI:
-    settings = settings or get_settings()
+    if settings is None:  # a real run (tests pass their own settings and must not touch .env)
+        from clipforge import settings_store
+
+        settings_store.migrate_env()
+        settings = get_settings()
     token = token or os.environ.get("CLIPFORGE_TOKEN") or secrets.token_urlsafe(24)
     projects_dir = settings.projects_dir
     projects_dir.mkdir(parents=True, exist_ok=True)

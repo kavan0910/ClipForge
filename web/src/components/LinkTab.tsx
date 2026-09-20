@@ -97,7 +97,7 @@ export function LinkTab({ onStart }: { onStart: (id: string) => void }) {
             {softer && (
               <p className="warn" style={{ marginTop: 8 }}>
                 A vertical crop of a {preview.will_download_height}p frame is only about{' '}
-                {Math.round(((preview.will_download_height ?? 0) * 9) / 16)} px wide, so clips will be softer. A higher source resolution improves sharpness.
+                {Math.round(((preview.will_download_height ?? 0) * 9) / 16)} px wide, so clips will be softer. Set MAX_SOURCE_HEIGHT to 2160 in Settings to download 4K when the video has it.
               </p>
             )}
           </div>

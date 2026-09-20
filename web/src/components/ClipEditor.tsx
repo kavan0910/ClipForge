@@ -19,6 +19,7 @@ export function ClipEditor({ projectId, clipId, onBack }: { projectId: string; c
   const [stale, setStale] = useState(false)
   const [starting, setStarting] = useState(false)
   const [editing, setEditing] = useState<number | null>(null)
+  const [quality, setQuality] = useState<'auto' | 'off'>('auto')
   const [saved, setSaved] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [cap, setCap] = useState<{ timeline: Timeline; template: Template } | null>(null)
   const video = useRef<HTMLVideoElement>(null)
@@ -107,7 +108,7 @@ export function ClipEditor({ projectId, clipId, onBack }: { projectId: string; c
     if (k >= 0 && k < data.words.length) clickWord(k, false)
   }
   const decide = (status: 'approved' | 'rejected') => change({ status })
-  const doRender = () => { setStarting(true); void api.render(projectId, clipId, { template: edits?.template ?? undefined, brand: edits?.brand ?? undefined }).catch((e: Error) => { setStarting(false); setError(e.message) }) }
+  const doRender = () => { setStarting(true); void api.render(projectId, clipId, { template: edits?.template ?? undefined, brand: edits?.brand ?? undefined, upscale: quality }).catch((e: Error) => { setStarting(false); setError(e.message) }) }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -182,6 +183,10 @@ export function ClipEditor({ projectId, clipId, onBack }: { projectId: string; c
             <button className="btn btn-primary" onClick={doRender} disabled={busy} data-testid="render">
               {busy ? `Rendering ${Math.round(data.render.pct * 100)}%` : 'Render clip'}
             </button>
+            <select className="field" aria-label="Render quality" style={{ width: 'auto' }} value={quality} onChange={(e) => setQuality(e.target.value as 'auto' | 'off')} disabled={busy}>
+              <option value="auto">Best quality (AI upscale, slower)</option>
+              <option value="off">Fast (standard scaling)</option>
+            </select>
             {busy && <button className="btn" onClick={() => void api.cancelRender(projectId, clipId).then(load)}>Cancel</button>}
           </div>
           {data.render.state === 'error' && <p className="alert" role="alert">{data.render.error?.message} {data.render.error?.action}</p>}

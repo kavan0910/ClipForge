@@ -8,7 +8,7 @@ from pathlib import Path
 
 PUBLIC_KEYS = {
     "CLIPFORGE_SCAN_MODEL", "CLIPFORGE_CURATE_MODEL", "CLIPFORGE_MAX_SCAN_MODEL", "CLIPFORGE_MAX_CURATE_MODEL",
-    "MAX_JOB_COST_USD", "ASR_BACKEND", "ASR_MODEL", "ASR_MODEL_NON_ENGLISH", "MAX_SOURCE_HEIGHT", "YTDLP_COOKIES_FROM_BROWSER", "RENDER_WORKERS", "GOOGLE_CLIENT_ID",
+    "MAX_JOB_COST_USD", "ASR_BACKEND", "ASR_MODEL", "RENDER_UPSCALE", "ASR_MODEL_NON_ENGLISH", "MAX_SOURCE_HEIGHT", "YTDLP_COOKIES_FROM_BROWSER", "RENDER_WORKERS", "GOOGLE_CLIENT_ID",
 }  # fmt: skip
 SECRET_KEYS = {"ANTHROPIC_API_KEY", "HF_TOKEN", "GOOGLE_CLIENT_SECRET"}
 ENV_FILE = Path(".env")
@@ -44,3 +44,18 @@ def write_env(updates: dict[str, str], path: Path | None = None) -> None:
 
 def mask(secret: str | None) -> str | None:
     return None if not secret else ("*" * 8 + secret[-4:] if len(secret) > 8 else "*" * len(secret))
+
+
+def migrate_env(path: Path | None = None) -> bool:
+    """One-time: the old default cap of 1080p made every vertical crop soft. Raise an untouched 1080 to 2160."""
+    path = path or ENV_FILE
+    lines = _read(path)
+    marker = "# clipforge: source cap raised to 2160 (4K) for sharper crops"
+    if marker in lines or "MAX_SOURCE_HEIGHT=1080" not in lines:
+        return False
+    out = [("MAX_SOURCE_HEIGHT=2160" if ln == "MAX_SOURCE_HEIGHT=1080" else ln) for ln in lines] + [
+        marker
+    ]
+    path.write_text("\n".join(out) + "\n")
+    path.chmod(0o600)
+    return True
