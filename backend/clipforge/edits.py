@@ -46,6 +46,7 @@ class ClipEdits(BaseModel):
     brand: str | None = None
     hook_enabled: bool = True
     captions_enabled: bool = True
+    framing: Literal["fit", "smart"] | None = None  # None: the DEFAULT_LAYOUT setting
     caption_text: dict[str, str] = Field(
         default_factory=dict
     )  # word index (as text) -> corrected caption text

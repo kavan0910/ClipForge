@@ -41,6 +41,7 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
   const [steer, setSteer] = useState('')
   const unsub = useRef<() => void>(() => undefined)
   const [actionError, setActionError] = useState('')
+  const [track, setTrack] = useState<number | null>(null)
 
   const refresh = useCallback(
     () =>
@@ -144,7 +145,30 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
 
       {actionError && <div className="alert" role="alert" data-testid="action-error"><strong>{actionError}</strong></div>}
 
-      {project.status === 'error' && project.error && (
+      {project.status === 'error' && project.error?.code === 'choose_audio_track' && (
+        <section className="card" aria-label="Choose audio track" data-testid="audio-track-choice" style={{ display: 'grid', gap: 12 }}>
+          <div>
+            <h3 style={{ fontSize: 17 }}>Which audio track should we use?</h3>
+            <p className="muted" style={{ margin: '4px 0 0' }}>{project.error.message} {project.error.action}</p>
+          </div>
+          <div role="radiogroup" aria-label="Audio tracks" style={{ display: 'grid', gap: 8 }}>
+            {(project.error.tracks ?? []).map((t) => (
+              <label key={t.index} className="card" data-hover="true" style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '12px 14px', cursor: 'pointer', borderColor: track === t.index ? 'var(--accent)' : undefined }}>
+                <input type="radio" name="audio-track" checked={track === t.index} onChange={() => setTrack(t.index)} />
+                <span style={{ flex: 1 }}>
+                  <strong>{t.language ? t.language.toUpperCase() : 'Unknown language'}</strong>
+                  {t.title ? ` · ${t.title}` : ''}
+                  <span className="muted"> · {t.channels === 2 ? 'stereo' : t.channels === 1 ? 'mono' : `${t.channels} ch`} · {t.codec} · track {t.index}</span>
+                </span>
+                {t.default && <span className="chip">default</span>}
+              </label>
+            ))}
+          </div>
+          <div><button className="btn btn-primary" disabled={track === null} onClick={() => track !== null && void api.chooseAudioTrack(id, track).then(() => { void refresh(); listen() }).catch((e: Error) => setActionError(e.message))}>Continue with this track</button></div>
+        </section>
+      )}
+
+      {project.status === 'error' && project.error && project.error.code !== 'choose_audio_track' && (
         <div className="alert" role="alert">
           <strong>{project.error.message}</strong>
           {project.error.action && <p style={{ margin: '4px 0 0' }}>{project.error.action}</p>}
@@ -252,6 +276,13 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
           <h3 style={{ fontSize: 15, marginBottom: 6 }} data-testid="transcript-ready">
             {project.transcript.words === 0 ? 'No speech detected' : 'Transcript ready'}
           </h3>
+          {(project.transcript.skipped?.length ?? 0) > 0 && (
+            <p className="warn" role="status" data-testid="skipped-notice">
+              This video mixes languages. Only the English parts were transcribed, and clips come only from those.
+              Skipped: {project.transcript.skipped!.map((x) => `${fmtDuration(x.start)}–${fmtDuration(x.end)} (${x.language})`).join(', ')}.
+              To transcribe everything, set LANGUAGE_POLICY=auto in Settings and import again.
+            </p>
+          )}
           {project.transcript.words === 0 && (
             <p className="warn">
               The audio has no detectable speech (music or ambient sound only), so there is nothing to clip.

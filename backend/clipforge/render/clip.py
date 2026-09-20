@@ -146,7 +146,10 @@ def render_clip(
     turns = rplan.turns_from_words(transcript.words, clip_start, clip_end)
     cw, _ = crop_size(scene.width, scene.height, OUT_W / OUT_H, 1.0)
     shots = rplan.shots_from_cuts(clip_start, clip_end, scene_cuts or [])
-    plan = rplan.build_plan(scene, shots, turns, cw, overrides=clipedits.layout_overrides(edits))
+    fit = (edits.framing or get_settings().default_layout) == "fit"
+    plan = rplan.build_plan(
+        scene, shots, turns, cw, overrides=clipedits.layout_overrides(edits), fit=fit
+    )
     solved = solve(
         scene, plan, edl, fps, punch_in=punch_in, max_zoom=cam_mod.max_zoom_for(video.height)
     )

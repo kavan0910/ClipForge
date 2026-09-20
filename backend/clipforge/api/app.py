@@ -71,6 +71,10 @@ class Recurate(BaseModel):
     preset: str = "balanced"
 
 
+class AudioTrackRequest(BaseModel):
+    track: int
+
+
 class UploadCreate(BaseModel):
     filename: str
     size: int
@@ -249,6 +253,7 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
             data["transcript"] = {
                 k: t[k] for k in ("language", "asr_model", "duration", "diarized")
             }
+            data["transcript"]["skipped"] = t.get("skipped", [])
             data["transcript"]["words"] = len(t["words"])
             data["transcript"]["sentences"] = t["sentences"]
         events, _ = p.read_events(0)
@@ -264,13 +269,23 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
             data["curation_error"] = {k: stage_err.get(k) for k in ("code", "message", "action")}
         err = next((e for e in reversed(events) if e["type"] == "job_error"), None)
         if err and data["status"] == "error":
-            data["error"] = {k: err.get(k) for k in ("code", "message", "action")}
+            data["error"] = {
+                k: err.get(k) for k in ("code", "message", "action", "tracks") if k in err
+            }
         return data
 
     @app.post("/api/projects/{project_id}/cancel")
     async def cancel_project(project_id: str) -> dict[str, bool]:
         p = open_project(project_id)
         return {"cancelled": await run_in_threadpool(jobs.cancel, p)}
+
+    @app.post("/api/projects/{project_id}/audio-track")
+    async def choose_audio_track(project_id: str, req: AudioTrackRequest) -> dict[str, Any]:
+        p = open_project(project_id)
+        spec = json.loads(p.path("job.json").read_text())
+        spec.setdefault("options", {})["audio_track"] = req.track
+        p.path("job.json").write_text(json.dumps(spec))
+        return {"pid": await run_in_threadpool(jobs.start, p)}
 
     @app.post("/api/projects/{project_id}/resume")
     async def resume_project(project_id: str) -> dict[str, Any]:

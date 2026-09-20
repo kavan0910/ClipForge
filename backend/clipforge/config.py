@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     render_upscale: Literal["auto", "off"] = Field(
         default="auto", alias="RENDER_UPSCALE"
     )  # AI upscaling of soft crops
+    language_policy: Literal["english_first", "auto"] = Field(
+        default="english_first", alias="LANGUAGE_POLICY"
+    )
+    default_layout: Literal["fit", "smart"] = Field(
+        default="fit", alias="DEFAULT_LAYOUT"
+    )  # fit = whole frame, blurred sides
     max_source_height: int = Field(default=2160, alias="MAX_SOURCE_HEIGHT", ge=360, le=2160)
     ytdlp_cookies_from_browser: str | None = Field(default=None, alias="YTDLP_COOKIES_FROM_BROWSER")
     google_client_id: str | None = Field(default=None, alias="GOOGLE_CLIENT_ID")

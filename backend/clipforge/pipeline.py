@@ -7,13 +7,14 @@ import os
 import sys
 import time
 import wave
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 
 from clipforge import media
-from clipforge.asr.chunking import merge_chunks, plan_chunks
+from clipforge.asr.chunking import ChunkSpec, merge_chunks, plan_chunks
 from clipforge.asr.guards import GUARD_VERSION, apply_guards
 from clipforge.asr.prompt import build_initial_prompt
 from clipforge.asr.sentences import segment_sentences
@@ -21,7 +22,7 @@ from clipforge.asr.types import RawChunk
 from clipforge.asr.vad import speech_regions
 from clipforge.asr.worker import resolve_model
 from clipforge.config import Settings
-from clipforge.errors import ASRError, MediaError
+from clipforge.errors import ASRError, AudioTrackChoice, MediaError
 from clipforge.models import Probe, Source, Transcript, Word
 from clipforge.parallel import Background, Deferred
 from clipforge.procs import CancelToken, run_streaming
@@ -127,6 +128,12 @@ def ingest(
     track = (
         options.audio_track if options.audio_track is not None else media.default_audio_track(pr)
     )
+    if options.audio_track is None and len(pr.audio) > 1:
+        raise AudioTrackChoice(
+            "This video has several audio tracks. Choose which one to use.",
+            "Pick the track with the speech you want clipped, then continue.",
+            [a.model_dump() for a in pr.audio],
+        )
     if track not in {a.index for a in pr.audio}:
         raise MediaError(
             f"Audio track {track} does not exist in this file.", "Pick a listed track."
@@ -244,28 +251,86 @@ def pick_model(settings: Settings, lang: str | None) -> str:
     return settings.asr_model if is_english(lang) or other == "same" else other
 
 
-def detect_language(
-    project: Project, wav: Path, duration: float, backend: str, model: str, cancel: CancelToken
-) -> str | None:
-    """Language of the recording from a 30 s sample (cached per project). None if it cannot be told."""
-    cache = project.path("transcript", "language.json")
+def detect_languages(
+    project: Project,
+    wav: Path,
+    backend: str,
+    model: str,
+    cancel: CancelToken,
+    samples: list[tuple[float, float]],
+) -> list[str | None]:
+    """Language of each (start, end) sample, in one worker run (the model loads once). Cached per sample set."""
+    key = canonical_hash(backend, model, samples)[:12]
+    cache = project.path("transcript", f"languages_{key}.json")
     if cache.exists():
-        return json.loads(cache.read_text()).get("language")
-    start = max(min(duration * 0.3, duration - 30.0), 0.0)
-    cfg = {"backend": backend, "model": model, "wav": str(wav),
-           "detect": {"start": start, "end": min(start + 30.0, duration)}}  # fmt: skip
+        return json.loads(cache.read_text())
+    cfg = {
+        "backend": backend,
+        "model": model,
+        "wav": str(wav),
+        "detect": {"samples": [list(x) for x in samples]},
+    }
     cfg_path = project.path("transcript", "detect.json")
     cfg_path.write_text(json.dumps(cfg))
-    found: list[str] = []
+    found: dict[int, str] = {}
+
+    def on_line(line: str) -> None:
+        if line.startswith("CFLANG|"):
+            _, i, lang = line.split("|")
+            found[int(i)] = lang
+
     code, _ = run_streaming(
         [sys.executable, "-m", "clipforge.asr.worker", "--config", str(cfg_path)],
-        lambda line: found.append(line.split("|", 1)[1]) if line.startswith("CFLANG|") else None,
+        on_line,
         cancel,
         {**os.environ, "PYTHONUNBUFFERED": "1", "TOKENIZERS_PARALLELISM": "false"},
     )
-    lang = found[0] if code == 0 and found else None
-    cache.write_text(json.dumps({"language": lang}))
-    return lang
+    out = [found.get(i) if code == 0 else None for i in range(len(samples))]
+    cache.write_text(json.dumps(out))
+    return out
+
+
+def probe_samples(duration: float) -> list[tuple[float, float]]:
+    """Five spread 30 s samples (one for a very short file)."""
+    if duration <= 90:
+        return [(0.0, min(30.0, duration))]
+    out = []
+    for f in (0.1, 0.3, 0.5, 0.7, 0.9):
+        s0 = max(min(duration * f, duration - 30.0), 0.0)
+        out.append((round(s0, 2), round(min(s0 + 30.0, duration), 2)))
+    return out
+
+
+def english_regions(
+    labels: Sequence[str | None], window: float, duration: float
+) -> tuple[list[tuple[float, float]], list[dict]]:
+    """Group per-window language labels into English regions and the skipped (non-English) remainder."""
+    n = len(labels)
+    en = [bool(lang) and is_english(lang) for lang in labels]
+    for i in range(1, n - 1):  # a single odd window between two agreeing neighbours is noise
+        if en[i - 1] == en[i + 1] and en[i] != en[i - 1]:
+            en[i] = en[i - 1]
+    regions: list[tuple[float, float]] = []
+    skipped: list[dict] = []
+    i = 0
+    while i < n:
+        j = i
+        while j < n and en[j] == en[i]:
+            j += 1
+        a, b = i * window, min(j * window, duration)
+        if en[i] and b - a >= 30.0:
+            regions.append((a, b))
+        else:
+            langs = [x for x in labels[i:j] if x and not is_english(x)]
+            skipped.append(
+                {
+                    "start": a,
+                    "end": b,
+                    "language": max(set(langs), key=langs.count) if langs else "unknown",
+                }
+            )
+        i = j
+    return regions, skipped
 
 
 def transcribe(
@@ -282,10 +347,40 @@ def transcribe(
     backend = default_asr_backend(settings)
     wav = Path(source.audio_path or "")
     model = settings.asr_model
-    if settings.asr_model_non_english not in ("same", settings.asr_model):
-        lang_hint = language or detect_language(
-            project, wav, source.probe.duration, backend, model, cancel
+    duration = source.probe.duration
+    regions: list[tuple[float, float]] | None = None
+    skipped: list[dict] = []
+    other_rule = settings.asr_model_non_english not in ("same", settings.asr_model)
+    if language is None and (settings.language_policy == "english_first" or other_rule):
+        labels = detect_languages(project, wav, backend, model, cancel, probe_samples(duration))
+        known = [lang for lang in labels if lang]
+        english = [lang for lang in known if is_english(lang)]
+        foreign = [lang for lang in known if not is_english(lang)]
+        lang_hint: str | None = (
+            "en"
+            if known and not foreign
+            else (max(set(foreign), key=foreign.count) if foreign else None)
         )
+        if settings.language_policy == "english_first" and english and foreign:
+            # Mixed languages: find the English stretches (a 30 s language check per minute) and use only those.
+            reporter.progress(
+                "transcribe", 0.0, note="Several languages found: locating the English sections"
+            )
+            window = 60.0
+            n_win = max(int(-(-duration // window)), 1)
+            wins = [
+                (round(k * window + 15.0, 2), round(min(k * window + 45.0, duration), 2))
+                for k in range(n_win)
+            ]
+            wins = [(a, b) if b - a >= 5 else (max(a - 30, 0.0), b) for a, b in wins]
+            per_window = detect_languages(project, wav, backend, model, cancel, wins)
+            regions, skipped = english_regions(per_window, window, duration)
+            if regions:
+                lang_hint = "en"
+                language = "en"
+            else:
+                regions, skipped = None, []
+                lang_hint = max(set(foreign), key=foreign.count)
         model = pick_model(settings, lang_hint)
         if model != settings.asr_model:
             reporter.progress(
@@ -293,11 +388,24 @@ def transcribe(
                 0.0,
                 note=f"Detected language '{lang_hint}': using {model} for accuracy",
             )
+        elif skipped:
+            mins = sum(x["end"] - x["start"] for x in skipped) / 60
+            reporter.progress(
+                "transcribe",
+                0.0,
+                note=f"Using the English sections only ({mins:.0f} min in other languages skipped)",
+            )
     prompt = build_initial_prompt(
         source.platform.title or source.title, source.platform.channel, source.platform.tags,
         source.platform.description, brand_vocabulary or [],
     )  # fmt: skip
-    specs = plan_chunks(source.probe.duration)
+    if regions:
+        specs = []
+        for ra, rb in regions:
+            for sp in plan_chunks(rb - ra):
+                specs.append(ChunkSpec(len(specs), ra + sp.start, ra + sp.end))
+    else:
+        specs = plan_chunks(duration)
     want_diar = bool(diarize and settings.hf_token)
     params = {
         "backend": backend, "model": model, "language": language, "prompt": prompt,
@@ -386,7 +494,7 @@ def transcribe(
         lang = chunks[0].language if chunks else (language or "en")
         t = Transcript(
             language=lang, asr_backend=backend, asr_model=resolve_model(backend, model),
-            duration=source.probe.duration, words=words, sentences=sentences, diarized=diarized,
+            duration=source.probe.duration, words=words, sentences=sentences, diarized=diarized, skipped=skipped,
         )  # fmt: skip
         tmp = out_file.with_suffix(".partial")
         tmp.write_text(t.model_dump_json())

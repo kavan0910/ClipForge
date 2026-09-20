@@ -71,6 +71,9 @@ def start(project: Project, spec: dict[str, Any] | None = None) -> int:
         stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True, env=_child_env(),
     )  # fmt: skip
     _pid_file(project).write_text(str(proc.pid))
+    project.emit(
+        "job_started"
+    )  # so the status flips to running at once, not when the child gets going
     # Reap the child when it exits so a finished job is not seen as alive (zombie).
     threading.Thread(target=proc.wait, daemon=True).start()
     return proc.pid

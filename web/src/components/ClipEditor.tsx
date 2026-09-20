@@ -317,6 +317,15 @@ export function ClipEditor({ projectId, clipId, onBack }: { projectId: string; c
             )}
             {tab === 'layout' && (
               <>
+              <section className="card" aria-label="Framing">
+                <h3 style={{ fontSize: 15 }}>Framing</h3>
+                <p className="muted" style={{ margin: '4px 0 10px', fontSize: 13 }}>Fit shows the whole picture at full width with a soft blurred background: nothing is cropped or enlarged, so it stays sharp. Smart crop fills the vertical frame and follows the speaker, but enlarges the picture.</p>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} role="radiogroup" aria-label="Framing">
+                  {([['fit', 'Fit (whole frame)'], ['smart', 'Smart crop (follow speaker)']] as const).map(([v, label]) => (
+                    <button key={v} className="btn" role="radio" aria-checked={(edits.framing ?? 'fit') === v} aria-pressed={(edits.framing ?? 'fit') === v} data-testid={`framing-${v}`} onClick={() => change({ framing: v })}>{label}</button>
+                  ))}
+                </div>
+              </section>
           <section className="card" aria-label="Layout">
             <h3 style={{ fontSize: 15 }}>Layout per segment</h3>
             {data.layouts.length === 0 ? <p className="muted" style={{ margin: '6px 0 0' }}>Render once to plan the layouts, then override any segment here.</p> : (

@@ -58,5 +58,7 @@ def merge_chunks(chunks: list[RawChunk]) -> list[RawWord]:
         if nxt is not None and nxt.start < cur.end:
             upper = _cut_point(cur.words, nxt.start, cur.end)
         out.extend(w for w in cur.words if lower <= w.start < upper)
-        lower = upper
+        lower = (
+            upper if upper != float("inf") else float("-inf")
+        )  # no overlap with the next chunk: nothing to cut
     return out

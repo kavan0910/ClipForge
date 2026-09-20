@@ -287,6 +287,26 @@ def curate(
                 {"start": prop.start_sentence, "end": prop.end_sentence, "reason": why}
             )
         )
+    if (
+        transcript.skipped
+    ):  # sections in other languages were not transcribed: no clip may cross them
+        keep = []
+        for r in resolved:
+            hit = any(
+                pp.overlap_fraction((r.start, r.end), (x["start"], x["end"])) > 0
+                for x in transcript.skipped
+            )
+            if hit:
+                rejected.append(
+                    {
+                        "start": r.start,
+                        "end": r.end,
+                        "reason": "overlaps a section in another language",
+                    }
+                )
+            else:
+                keep.append(r)
+        resolved = keep
     for ex in existing:  # do not duplicate what is already in the project
         resolved = [
             r

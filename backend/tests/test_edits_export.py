@@ -239,3 +239,38 @@ def test_caption_text_and_toggle(tmp_path):
     tpl = load_template("karaoke-pop")
     tl = build_timeline([], tpl, 3.0, set(), hook="Hook", hook_enabled=True)
     assert tl.chunks == [] and tl.hook is not None  # captions off: the hook can still show
+
+
+def test_english_regions_from_window_labels():
+    from clipforge.pipeline import english_regions
+
+    labels = ["en", "en", "en", "hi", "hi", "hi", "hi", "en", "en", "en", "en"]
+    regions, skipped = english_regions(labels, 60.0, 660.0)
+    assert regions == [(0.0, 180.0), (420.0, 660.0)]
+    assert skipped == [{"start": 180.0, "end": 420.0, "language": "hi"}]
+    noisy = ["en", "en", "hi", "en", "en", "en"]  # one odd window inside English is noise
+    assert english_regions(noisy, 60.0, 360.0)[0] == [(0.0, 360.0)]
+    assert english_regions(["hi"] * 4, 60.0, 240.0)[0] == []  # no English at all: caller falls back
+    short = [
+        "hi",
+        "en",
+        "hi",
+        "hi",
+    ]  # an English blip under 30 s... a single 60 s window is smoothed away
+    assert english_regions(short, 60.0, 240.0)[0] == []
+
+
+def test_merge_chunks_keeps_chunks_that_do_not_overlap():
+    from clipforge.asr.chunking import merge_chunks
+    from clipforge.asr.types import RawChunk, RawWord
+
+    def w(t):
+        return RawWord(
+            w="x", start=t, end=t + 0.3, prob=1.0, no_speech=0.0, logprob=0.0, compression=1.0
+        )
+
+    a = RawChunk(index=0, start=0, end=120, language="en", words=[w(1), w(100)])
+    b = RawChunk(
+        index=1, start=240, end=371, language="en", words=[w(245), w(300)]
+    )  # a gap (skipped section) between
+    assert [x.start for x in merge_chunks([a, b])] == [1, 100, 245, 300]

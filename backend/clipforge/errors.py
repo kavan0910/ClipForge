@@ -29,3 +29,16 @@ class DiskSpaceError(ClipforgeError):
 
 class ASRError(ClipforgeError):
     code = "asr"
+
+
+class AudioTrackChoice(ClipforgeError):
+    """The file has several audio tracks and the user has not said which to use."""
+
+    code = "choose_audio_track"
+
+    def __init__(self, message: str, action: str, tracks: list[dict]) -> None:
+        super().__init__(message, action)
+        self.tracks = tracks
+
+    def to_dict(self) -> dict:  # type: ignore[override]
+        return {**super().to_dict(), "tracks": self.tracks}

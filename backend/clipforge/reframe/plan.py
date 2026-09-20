@@ -335,11 +335,16 @@ def _complete_override(scene: Scene, o: LayoutSegment) -> None:
 
 def build_plan(
     scene: Scene, shots: list[tuple[float, float]], turns: list[Turn], crop_w: float,
-    overrides: list[LayoutSegment] | None = None,
+    overrides: list[LayoutSegment] | None = None, fit: bool = False,
 ) -> list[LayoutSegment]:  # fmt: skip
-    """Layout per shot, merged with hysteresis; manual per-segment overrides win."""
-    segs = [plan_shot(scene, a, b, turns, crop_w) for a, b in shots if b - a > 1e-6]
-    segs = enforce_hysteresis(segs)
+    """Layout per shot, merged with hysteresis; manual per-segment overrides win.
+
+    `fit` shows the whole frame at full width over a blurred background for every shot (no crop, no enlargement)."""
+    if fit and shots:
+        segs = [LayoutSegment(shots[0][0], shots[-1][1], "fit_blur")]
+    else:
+        segs = [plan_shot(scene, a, b, turns, crop_w) for a, b in shots if b - a > 1e-6]
+        segs = enforce_hysteresis(segs)
     for o in overrides or []:
         _complete_override(scene, o)
         out: list[LayoutSegment] = []

@@ -112,3 +112,6 @@ class Transcript(BaseModel):
     words: list[Word]
     sentences: list[Sentence]
     diarized: bool = False
+    skipped: list[dict] = Field(
+        default_factory=list
+    )  # sections not transcribed: {start, end, language}

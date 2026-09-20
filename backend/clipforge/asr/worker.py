@@ -167,12 +167,13 @@ def _exit_if_orphaned() -> None:
 def main(config_path: str) -> int:
     _exit_if_orphaned()
     cfg = json.loads(Path(config_path).read_text())
-    if cfg.get("detect"):  # language ID on one short sample; prints CFLANG|<code>
+    if cfg.get("detect"):  # language ID on short samples; prints CFLANG|<index>|<code>
         d = cfg["detect"]
-        lang, _ = make_runner(cfg["backend"], cfg["model"]).run(
-            read_slice(cfg["wav"], d["start"], d["end"]), d["start"], None, None
-        )
-        print(f"CFLANG|{lang}", flush=True)
+        samples = d["samples"] if "samples" in d else [[d["start"], d["end"]]]
+        runner = make_runner(cfg["backend"], cfg["model"])
+        for i, (a, b) in enumerate(samples):
+            lang, _ = runner.run(read_slice(cfg["wav"], a, b), a, None, None)
+            print(f"CFLANG|{i}|{lang}", flush=True)
         return 0
     out_dir = Path(cfg["out_dir"])
     out_dir.mkdir(parents=True, exist_ok=True)

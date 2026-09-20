@@ -290,6 +290,8 @@ def register(
                 "ASR_MODEL_NON_ENGLISH": s.asr_model_non_english,
                 "MAX_SOURCE_HEIGHT": str(s.max_source_height),
                 "RENDER_UPSCALE": s.render_upscale,
+                "LANGUAGE_POLICY": s.language_policy,
+                "DEFAULT_LAYOUT": s.default_layout,
                 "YTDLP_COOKIES_FROM_BROWSER": s.ytdlp_cookies_from_browser or "",
                 "RENDER_WORKERS": str(s.render_workers or ""),
                 "GOOGLE_CLIENT_ID": s.google_client_id or "",

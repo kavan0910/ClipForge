@@ -77,12 +77,13 @@ export interface SentenceRow {
   speaker: string | null
 }
 
+export interface AudioTrackInfo { index: number; codec: string; channels: number; sample_rate: number; language?: string | null; title?: string | null; default: boolean }
 export interface ProjectData {
   id: string
   status: 'idle' | 'running' | 'done' | 'error' | 'cancelled'
   source?: { title: string; kind: string; quality: Quality; probe: { duration: number; video: unknown | null } }
-  transcript?: { language: string; asr_model: string; duration: number; words: number; sentences: SentenceRow[]; diarized: boolean }
-  error?: { code: string; message: string; action: string }
+  transcript?: { language: string; asr_model: string; duration: number; words: number; sentences: SentenceRow[]; diarized: boolean; skipped?: { start: number; end: number; language: string }[] }
+  error?: { code: string; message: string; action: string; tracks?: AudioTrackInfo[] }
   curation_error?: { code: string; message: string; action: string }
 }
 
@@ -118,7 +119,7 @@ export interface ClipEdits {
   title?: string | null; hook?: string | null; description?: string | null; hashtags?: string[] | null
   start_word?: number | null; end_word?: number | null; exclude: [number, number][]; cleanup: 'off' | 'light' | 'aggressive'
   restored: number[]; template?: string | null; brand?: string | null; hook_enabled: boolean
-  captions_enabled: boolean; caption_text: Record<string, string>
+  captions_enabled: boolean; caption_text: Record<string, string>; framing?: 'fit' | 'smart' | null
   layouts: { t0: number; t1: number; layout: string }[]; status?: 'proposed' | 'approved' | 'rejected' | null
 }
 export interface RenderState { state: 'idle' | 'running' | 'done' | 'error' | 'cancelled'; pct: number; note?: string | null; error?: { message: string; action: string } }
@@ -156,6 +157,7 @@ export const api = {
     request<{ project_id: string }>('/api/projects', { method: 'POST', body: JSON.stringify({ source, options: {} }) }),
   project: (id: string) => request<ProjectData>(`/api/projects/${id}`),
   cancel: (id: string) => request<{ cancelled: boolean }>(`/api/projects/${id}/cancel`, { method: 'POST' }),
+  chooseAudioTrack: (id: string, track: number) => request<{ pid: number }>(`/api/projects/${id}/audio-track`, { method: 'POST', body: JSON.stringify({ track }) }),
   resume: (id: string) => request<{ pid: number }>(`/api/projects/${id}/resume`, { method: 'POST' }),
   remove: (id: string) => request<{ ok: boolean }>(`/api/projects/${id}`, { method: 'DELETE' }),
   clips: (id: string) => request<{ clips: ClipRow[]; label: string }>(`/api/projects/${id}/clips`),
