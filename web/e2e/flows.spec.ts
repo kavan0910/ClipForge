@@ -15,10 +15,12 @@ async function projectId(page: import('@playwright/test').Page) {
   return page.url().split('#/p/')[1]
 }
 
-// Curation either proposes clips, or fails in isolation with a clear, actionable message
-// (for example no API credit). The transcript must never be lost either way.
+// Curation either proposes clips, finds none (a designed empty state), or fails in isolation with a clear,
+// actionable message (for example no API credit). The transcript must never be lost either way.
 async function expectCurationOutcome(page: import('@playwright/test').Page) {
-  await expect(page.getByTestId('clips-ready').or(page.getByTestId('curation-error'))).toBeVisible({ timeout: 90_000 })
+  await expect(
+    page.getByTestId('clips-ready').or(page.getByTestId('curation-error')).or(page.getByTestId('no-clips')),
+  ).toBeVisible({ timeout: 90_000 })
 }
 
 async function sourceShape(request: APIRequestContext, id: string) {

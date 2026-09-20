@@ -1,0 +1,61 @@
+{
+  "id": "boxed-highlight",
+  "label": "Boxed highlight",
+  "description": "The spoken word sits in a coloured pill.",
+  "font": {
+    "file": "Montserrat.ttf",
+    "family": "Montserrat",
+    "weight": 800,
+    "italic": false
+  },
+  "size": 0.066,
+  "case": "none",
+  "line_height": 1.2,
+  "fill": "#FFFFFF",
+  "stroke": {
+    "color": "#000000",
+    "width": 0.004
+  },
+  "shadow": {
+    "color": "#000000",
+    "blur": 0.006,
+    "dy": 0.004,
+    "opacity": 0.6
+  },
+  "active": {
+    "mode": "pill",
+    "color": "#FFFFFF",
+    "pill_color": "#FF3B6B",
+    "pill_radius": 0.014
+  },
+  "motion": {
+    "kind": "slide_up",
+    "ms": 180,
+    "easing": "ease_out"
+  },
+  "chunking": {
+    "max_words": 4,
+    "max_chars_per_line": 16
+  },
+  "hook": {
+    "size": 0.066,
+    "font": {
+      "file": "Montserrat.ttf",
+      "family": "Montserrat",
+      "weight": 800,
+      "italic": false
+    },
+    "fill": "#FFFFFF",
+    "box": {
+      "color": "#FF3B6B",
+      "opacity": 1.0,
+      "radius": 0.016,
+      "pad_x": 0.032,
+      "pad_y": 0.016
+    },
+    "stroke": {
+      "color": "#000000",
+      "width": 0.0
+    }
+  }
+}

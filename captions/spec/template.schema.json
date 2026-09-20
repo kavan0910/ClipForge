@@ -1,0 +1,546 @@
+{
+ "$defs": {
+  "Active": {
+   "description": "Treatment of the word being spoken.",
+   "properties": {
+    "mode": {
+     "default": "color",
+     "enum": [
+      "none",
+      "color",
+      "scale",
+      "pill",
+      "underline"
+     ],
+     "title": "Mode",
+     "type": "string"
+    },
+    "color": {
+     "default": "#FFE14D",
+     "title": "Color",
+     "type": "string"
+    },
+    "scale": {
+     "default": 1.1,
+     "title": "Scale",
+     "type": "number"
+    },
+    "pill_color": {
+     "default": "#FF3B6B",
+     "title": "Pill Color",
+     "type": "string"
+    },
+    "pill_radius": {
+     "default": 0.012,
+     "title": "Pill Radius",
+     "type": "number"
+    },
+    "underline_color": {
+     "default": "#FFE14D",
+     "title": "Underline Color",
+     "type": "string"
+    },
+    "underline_height": {
+     "default": 0.005,
+     "title": "Underline Height",
+     "type": "number"
+    }
+   },
+   "title": "Active",
+   "type": "object"
+  },
+  "Anchor": {
+   "properties": {
+    "y": {
+     "default": 0.64,
+     "title": "Y",
+     "type": "number"
+    },
+    "align": {
+     "default": "center",
+     "enum": [
+      "center",
+      "left"
+     ],
+     "title": "Align",
+     "type": "string"
+    }
+   },
+   "title": "Anchor",
+   "type": "object"
+  },
+  "Box": {
+   "properties": {
+    "color": {
+     "default": "#000000",
+     "title": "Color",
+     "type": "string"
+    },
+    "opacity": {
+     "default": 0.55,
+     "title": "Opacity",
+     "type": "number"
+    },
+    "radius": {
+     "default": 0.012,
+     "title": "Radius",
+     "type": "number"
+    },
+    "pad_x": {
+     "default": 0.022,
+     "title": "Pad X",
+     "type": "number"
+    },
+    "pad_y": {
+     "default": 0.01,
+     "title": "Pad Y",
+     "type": "number"
+    }
+   },
+   "title": "Box",
+   "type": "object"
+  },
+  "Chunking": {
+   "properties": {
+    "min_words": {
+     "default": 1,
+     "title": "Min Words",
+     "type": "integer"
+    },
+    "max_words": {
+     "default": 4,
+     "title": "Max Words",
+     "type": "integer"
+    },
+    "max_lines": {
+     "default": 2,
+     "maximum": 2,
+     "title": "Max Lines",
+     "type": "integer"
+    },
+    "max_chars_per_line": {
+     "default": 18,
+     "title": "Max Chars Per Line",
+     "type": "integer"
+    },
+    "pause_break": {
+     "default": 0.45,
+     "title": "Pause Break",
+     "type": "number"
+    },
+    "target_wps": {
+     "default": 2.6,
+     "title": "Target Wps",
+     "type": "number"
+    }
+   },
+   "title": "Chunking",
+   "type": "object"
+  },
+  "Emphasis": {
+   "description": "Words the LLM marked as keywords.",
+   "properties": {
+    "color": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Color"
+    },
+    "scale": {
+     "default": 1.0,
+     "title": "Scale",
+     "type": "number"
+    },
+    "weight": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Weight"
+    }
+   },
+   "title": "Emphasis",
+   "type": "object"
+  },
+  "Font": {
+   "properties": {
+    "file": {
+     "title": "File",
+     "type": "string"
+    },
+    "family": {
+     "title": "Family",
+     "type": "string"
+    },
+    "weight": {
+     "default": 700,
+     "title": "Weight",
+     "type": "integer"
+    },
+    "italic": {
+     "default": false,
+     "title": "Italic",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "file",
+    "family"
+   ],
+   "title": "Font",
+   "type": "object"
+  },
+  "HookStyle": {
+   "description": "Title shown in the first seconds. Same design tokens, own placement and duration.",
+   "properties": {
+    "font": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Font"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    },
+    "size": {
+     "default": 0.07,
+     "title": "Size",
+     "type": "number"
+    },
+    "case": {
+     "default": "none",
+     "enum": [
+      "none",
+      "upper",
+      "lower"
+     ],
+     "title": "Case",
+     "type": "string"
+    },
+    "fill": {
+     "default": "#FFFFFF",
+     "title": "Fill",
+     "type": "string"
+    },
+    "stroke": {
+     "$ref": "#/$defs/Stroke",
+     "default": {
+      "color": "#000000",
+      "width": 0.004
+     }
+    },
+    "box": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Box"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": {
+      "color": "#000000",
+      "opacity": 0.6,
+      "radius": 0.012,
+      "pad_x": 0.022,
+      "pad_y": 0.01
+     }
+    },
+    "y": {
+     "default": 0.2,
+     "title": "Y",
+     "type": "number"
+    },
+    "seconds": {
+     "default": 2.6,
+     "title": "Seconds",
+     "type": "number"
+    },
+    "max_width": {
+     "default": 0.82,
+     "title": "Max Width",
+     "type": "number"
+    }
+   },
+   "title": "HookStyle",
+   "type": "object"
+  },
+  "Motion": {
+   "properties": {
+    "kind": {
+     "default": "pop",
+     "enum": [
+      "none",
+      "pop",
+      "fade",
+      "slide_up",
+      "typewriter"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "ms": {
+     "default": 180,
+     "title": "Ms",
+     "type": "integer"
+    },
+    "easing": {
+     "default": "ease_out",
+     "enum": [
+      "linear",
+      "ease_out",
+      "ease_in_out",
+      "back_out"
+     ],
+     "title": "Easing",
+     "type": "string"
+    },
+    "out_kind": {
+     "default": "fade",
+     "enum": [
+      "none",
+      "fade"
+     ],
+     "title": "Out Kind",
+     "type": "string"
+    },
+    "out_ms": {
+     "default": 90,
+     "title": "Out Ms",
+     "type": "integer"
+    }
+   },
+   "title": "Motion",
+   "type": "object"
+  },
+  "Shadow": {
+   "properties": {
+    "color": {
+     "default": "#000000",
+     "title": "Color",
+     "type": "string"
+    },
+    "blur": {
+     "default": 0.0,
+     "title": "Blur",
+     "type": "number"
+    },
+    "dx": {
+     "default": 0.0,
+     "title": "Dx",
+     "type": "number"
+    },
+    "dy": {
+     "default": 0.004,
+     "title": "Dy",
+     "type": "number"
+    },
+    "opacity": {
+     "default": 0.6,
+     "title": "Opacity",
+     "type": "number"
+    }
+   },
+   "title": "Shadow",
+   "type": "object"
+  },
+  "Stroke": {
+   "properties": {
+    "color": {
+     "default": "#000000",
+     "title": "Color",
+     "type": "string"
+    },
+    "width": {
+     "default": 0.0,
+     "title": "Width",
+     "type": "number"
+    }
+   },
+   "title": "Stroke",
+   "type": "object"
+  }
+ },
+ "properties": {
+  "id": {
+   "title": "Id",
+   "type": "string"
+  },
+  "label": {
+   "title": "Label",
+   "type": "string"
+  },
+  "description": {
+   "default": "",
+   "title": "Description",
+   "type": "string"
+  },
+  "font": {
+   "$ref": "#/$defs/Font"
+  },
+  "size": {
+   "default": 0.075,
+   "title": "Size",
+   "type": "number"
+  },
+  "case": {
+   "default": "none",
+   "enum": [
+    "none",
+    "upper",
+    "lower"
+   ],
+   "title": "Case",
+   "type": "string"
+  },
+  "tracking": {
+   "default": 0.0,
+   "title": "Tracking",
+   "type": "number"
+  },
+  "line_height": {
+   "default": 1.12,
+   "title": "Line Height",
+   "type": "number"
+  },
+  "fill": {
+   "default": "#FFFFFF",
+   "title": "Fill",
+   "type": "string"
+  },
+  "stroke": {
+   "$ref": "#/$defs/Stroke",
+   "default": {
+    "color": "#000000",
+    "width": 0.0
+   }
+  },
+  "shadow": {
+   "$ref": "#/$defs/Shadow",
+   "default": {
+    "color": "#000000",
+    "blur": 0.0,
+    "dx": 0.0,
+    "dy": 0.004,
+    "opacity": 0.6
+   }
+  },
+  "box": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/Box"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null
+  },
+  "active": {
+   "$ref": "#/$defs/Active",
+   "default": {
+    "mode": "color",
+    "color": "#FFE14D",
+    "scale": 1.1,
+    "pill_color": "#FF3B6B",
+    "pill_radius": 0.012,
+    "underline_color": "#FFE14D",
+    "underline_height": 0.005
+   }
+  },
+  "emphasis": {
+   "$ref": "#/$defs/Emphasis",
+   "default": {
+    "color": null,
+    "scale": 1.0,
+    "weight": null
+   }
+  },
+  "motion": {
+   "$ref": "#/$defs/Motion",
+   "default": {
+    "kind": "pop",
+    "ms": 180,
+    "easing": "ease_out",
+    "out_kind": "fade",
+    "out_ms": 90
+   }
+  },
+  "chunking": {
+   "$ref": "#/$defs/Chunking",
+   "default": {
+    "min_words": 1,
+    "max_words": 4,
+    "max_lines": 2,
+    "max_chars_per_line": 18,
+    "pause_break": 0.45,
+    "target_wps": 2.6
+   }
+  },
+  "anchor": {
+   "$ref": "#/$defs/Anchor",
+   "default": {
+    "y": 0.64,
+    "align": "center"
+   }
+  },
+  "hook": {
+   "$ref": "#/$defs/HookStyle",
+   "default": {
+    "font": null,
+    "size": 0.07,
+    "case": "none",
+    "fill": "#FFFFFF",
+    "stroke": {
+     "color": "#000000",
+     "width": 0.004
+    },
+    "box": {
+     "color": "#000000",
+     "opacity": 0.6,
+     "pad_x": 0.022,
+     "pad_y": 0.01,
+     "radius": 0.012
+    },
+    "y": 0.2,
+    "seconds": 2.6,
+    "max_width": 0.82
+   }
+  },
+  "emoji": {
+   "default": false,
+   "title": "Emoji",
+   "type": "boolean"
+  },
+  "strip_punctuation": {
+   "default": false,
+   "title": "Strip Punctuation",
+   "type": "boolean"
+  },
+  "mask_profanity": {
+   "default": false,
+   "title": "Mask Profanity",
+   "type": "boolean"
+  }
+ },
+ "required": [
+  "id",
+  "label",
+  "font"
+ ],
+ "title": "CaptionTemplate",
+ "type": "object"
+}

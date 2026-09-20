@@ -18,6 +18,9 @@ class Box:
     h: float
     score: float
     eye_y: float | None = None  # mean y of the two eye landmarks (SCRFD only)
+    kps: tuple[float, ...] | None = (
+        None  # 5 landmarks x,y: left eye, right eye, nose, mouth left, mouth right
+    )
 
     @property
     def cx(self) -> float:
@@ -110,6 +113,9 @@ class Scrfd:
                     (cy + bottom) / scale,
                 )
                 eye_y = float((cy + (kps[i][1] + kps[i][3]) / 2) / scale)
+                pts = tuple(
+                    float((cx if j % 2 == 0 else cy) + kps[i][j]) / scale for j in range(10)
+                )
                 boxes.append(
                     Box(
                         float(x1),
@@ -118,6 +124,7 @@ class Scrfd:
                         float(y2 - y1),
                         float(scores[i]),
                         eye_y,
+                        pts,
                     )
                 )
         return nms(boxes)

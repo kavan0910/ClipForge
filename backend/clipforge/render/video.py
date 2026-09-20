@@ -132,43 +132,75 @@ def compose(frame: np.ndarray, spec: FrameSpec, w: int = OUT_W, h: int = OUT_H) 
     return _fit_blur(frame, w, h)
 
 
+def _ass_filter(ass: Path, fonts: Path | None) -> str:
+    """libass overlay in the SAME encode (no second video pass). Paths are escaped for the filtergraph."""
+
+    def esc(p: Path) -> str:
+        return str(p).replace("\\", "/").replace(":", "\\:").replace("'", "\\'")
+
+    return f"ass=filename={esc(ass)}" + (f":fontsdir={esc(fonts)}" if fonts else "")
+
+
 def encode_argv(
-    out: Path,
-    audio: Path,
-    fps: float,
-    duration: float,
-    fast: bool,
-    w: int = OUT_W,
-    h: int = OUT_H,
-    codec_args: list[str] | None = None,
-) -> list[str]:
-    video = codec_args or (["-c:v", "h264_videotoolbox", "-q:v", "65", "-profile:v", "high", "-allow_sw", "1"] if fast
-             else ["-c:v", "libx264", "-profile:v", "high", "-preset", "slow", "-crf", "17",
-              "-x264-params", "colorprim=bt709:transfer=bt709:colmatrix=bt709:fullrange=off"])  # fmt: skip
-    return ["ffmpeg", "-nostdin", "-v", "error", "-y",
+    out: Path, audio: Path, fps: float, duration: float, fast: bool, w: int = OUT_W, h: int = OUT_H,
+    codec_args: list[str] | None = None, ass_path: Path | None = None, fonts_dir: Path | None = None,
+    layers: list[tuple[Path, int]] | None = None,
+) -> list[str]:  # fmt: skip
+    """One ffmpeg process: raw frames + audio (+ alpha caption layers) -> one H.264/AAC file.
+
+    `layers` are (ffconcat list of PNG stills, y offset). They are overlaid before colour conversion, so the
+    picture is still compressed exactly once.
+    """
+    video = codec_args or (
+        ["-c:v", "h264_videotoolbox", "-q:v", "65", "-profile:v", "high", "-allow_sw", "1"]
+        if fast
+        else ["-c:v", "libx264", "-profile:v", "high", "-preset", "slow", "-crf", "17",
+              "-x264-params", "colorprim=bt709:transfer=bt709:colmatrix=bt709:fullrange=off"]
+    )  # fmt: skip
+    argv = ["ffmpeg", "-nostdin", "-v", "error", "-y",
             "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{w}x{h}", "-r", fps_arg(fps), "-i", "-",
-            "-i", str(audio), "-map", "0:v", "-map", "1:a",
-            "-vf", "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p", *video,
-            "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv",
-            "-c:a", "aac", "-b:a", "192k", "-t", f"{duration:.6f}", "-movflags", "+faststart", str(out)]  # fmt: skip
+            "-i", str(audio)]  # fmt: skip
+    for concat, _ in layers or []:
+        argv += ["-f", "concat", "-safe", "0", "-i", str(concat)]
+    final = "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p"
+    if layers:
+        chain = ["[0:v]" + (_ass_filter(ass_path, fonts_dir) if ass_path else "null") + "[b0]"]
+        for k, (_, y) in enumerate(layers):
+            chain.append(f"[b{k}][{k + 2}:v]overlay=0:{y}:format=auto:eof_action=pass[b{k + 1}]")
+        chain.append(f"[b{len(layers)}]{final}[vout]")
+        argv += ["-filter_complex", ";".join(chain), "-map", "[vout]", "-map", "1:a"]
+    else:
+        vf = (_ass_filter(ass_path, fonts_dir) + "," if ass_path else "") + final
+        argv += ["-map", "0:v", "-map", "1:a", "-vf", vf]
+    return [*argv, *video, "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709",
+            "-color_range", "tv", "-c:a", "aac", "-b:a", "192k", "-t", f"{duration:.6f}", "-movflags", "+faststart", str(out)]  # fmt: skip
 
 
 def render_video(
     master: Path, video: VideoInfo, edl: EDL, solved: Solved, audio: Path, out: Path, fast: bool = False,
     tonemap_ok: bool = True, on_progress: Callable[[float], None] | None = None, cancel: CancelToken | None = None,
     overlay: Callable[[np.ndarray, int], np.ndarray] | None = None, codec_args: list[str] | None = None,
+    ass_path: Path | None = None, fonts_dir: Path | None = None,
+    layers: list[tuple[Path, int]] | None = None, head: list[np.ndarray] | None = None,
+    tail: list[np.ndarray] | None = None,
 ) -> None:  # fmt: skip
     """Decode each kept segment, compose every output frame, pipe into one encode."""
     fps = solved.fps
-    total = len(solved.frames)
-    proc = subprocess.Popen(encode_argv(out.with_suffix(".partial.mp4"), audio, fps, total / fps, fast, codec_args=codec_args),
+    head, tail = head or [], tail or []
+    body = len(solved.frames)
+    total = len(head) + body + len(tail)
+    proc = subprocess.Popen(encode_argv(out.with_suffix(".partial.mp4"), audio, fps, total / fps, fast, codec_args=codec_args,
+                                ass_path=ass_path, fonts_dir=fonts_dir, layers=layers),
                             stdin=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)  # fmt: skip
     written = 0
     try:
         assert proc.stdin is not None
+        for card in head:
+            proc.stdin.write(np.ascontiguousarray(card).tobytes())
+            written += 1
         for seg in edl.segments:
             f0 = round(seg.out_in * fps)
-            f1 = min(round(seg.out_out * fps), total)
+            f1 = min(round(seg.out_out * fps), body)
             for i, frame in enumerate(
                 decode_segment(master, video, seg.src_in, f1 - f0, fps, tonemap_ok)
             ):
@@ -181,6 +213,9 @@ def render_video(
                 written += 1
                 if on_progress and written % 15 == 0:
                     on_progress(written / total)
+        for card in tail:
+            proc.stdin.write(np.ascontiguousarray(card).tobytes())
+            written += 1
         proc.stdin.close()
         err = proc.stderr.read().decode(errors="replace") if proc.stderr else ""
         if proc.wait() != 0:

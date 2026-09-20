@@ -1,0 +1,56 @@
+{
+  "id": "karaoke-pop",
+  "label": "Karaoke pop",
+  "description": "Bold uppercase, yellow active word pops.",
+  "font": {
+    "file": "Anton-Regular.ttf",
+    "family": "Anton",
+    "weight": 400,
+    "italic": false
+  },
+  "size": 0.088,
+  "case": "upper",
+  "tracking": 0.01,
+  "line_height": 1.1,
+  "fill": "#FFFFFF",
+  "stroke": {
+    "color": "#000000",
+    "width": 0.01
+  },
+  "shadow": {
+    "color": "#000000",
+    "blur": 0.004,
+    "dy": 0.006,
+    "opacity": 0.7
+  },
+  "active": {
+    "mode": "scale",
+    "color": "#FFE14D",
+    "scale": 1.14
+  },
+  "emphasis": {
+    "color": "#7CFF6B",
+    "scale": 1.06
+  },
+  "motion": {
+    "kind": "pop",
+    "ms": 170,
+    "easing": "back_out"
+  },
+  "chunking": {
+    "max_words": 3,
+    "max_chars_per_line": 14,
+    "target_wps": 2.4
+  },
+  "emoji": true,
+  "hook": {
+    "size": 0.078,
+    "case": "upper",
+    "fill": "#FFE14D",
+    "stroke": {
+      "color": "#000000",
+      "width": 0.008
+    },
+    "box": null
+  }
+}

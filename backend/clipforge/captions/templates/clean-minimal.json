@@ -1,0 +1,53 @@
+{
+  "id": "clean-minimal",
+  "label": "Clean minimal",
+  "description": "Quiet sans, soft shadow, underline follows the word.",
+  "font": {
+    "file": "Inter.ttf",
+    "family": "Inter",
+    "weight": 600,
+    "italic": false
+  },
+  "size": 0.06,
+  "line_height": 1.18,
+  "fill": "#FFFFFF",
+  "stroke": {
+    "color": "#000000",
+    "width": 0.002
+  },
+  "shadow": {
+    "color": "#000000",
+    "blur": 0.01,
+    "dy": 0.004,
+    "opacity": 0.75
+  },
+  "active": {
+    "mode": "underline",
+    "underline_color": "#FFFFFF",
+    "underline_height": 0.004
+  },
+  "emphasis": {
+    "weight": 800
+  },
+  "motion": {
+    "kind": "fade",
+    "ms": 140,
+    "easing": "ease_out"
+  },
+  "chunking": {
+    "max_words": 5,
+    "max_chars_per_line": 22,
+    "target_wps": 3.2
+  },
+  "hook": {
+    "size": 0.062,
+    "fill": "#FFFFFF",
+    "box": {
+      "color": "#000000",
+      "opacity": 0.45,
+      "radius": 0.02,
+      "pad_x": 0.03,
+      "pad_y": 0.014
+    }
+  }
+}

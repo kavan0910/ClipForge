@@ -1,0 +1,59 @@
+{
+  "id": "editorial-serif",
+  "label": "Editorial serif",
+  "description": "Elegant serif in cream, underline follows the word.",
+  "font": {
+    "file": "PlayfairDisplay.ttf",
+    "family": "Playfair Display",
+    "weight": 700,
+    "italic": false
+  },
+  "size": 0.068,
+  "line_height": 1.15,
+  "fill": "#FFF6E6",
+  "stroke": {
+    "color": "#000000",
+    "width": 0.003
+  },
+  "shadow": {
+    "color": "#000000",
+    "blur": 0.01,
+    "dy": 0.005,
+    "opacity": 0.7
+  },
+  "active": {
+    "mode": "underline",
+    "underline_color": "#F2B84B",
+    "underline_height": 0.005,
+    "color": "#F2B84B"
+  },
+  "emphasis": {
+    "weight": 900,
+    "color": "#F2B84B"
+  },
+  "motion": {
+    "kind": "fade",
+    "ms": 200,
+    "easing": "ease_in_out"
+  },
+  "chunking": {
+    "max_words": 4,
+    "max_chars_per_line": 18,
+    "target_wps": 2.6
+  },
+  "hook": {
+    "size": 0.07,
+    "font": {
+      "file": "PlayfairDisplay.ttf",
+      "family": "Playfair Display",
+      "weight": 800,
+      "italic": false
+    },
+    "fill": "#FFF6E6",
+    "box": null,
+    "stroke": {
+      "color": "#000000",
+      "width": 0.004
+    }
+  }
+}

@@ -214,6 +214,13 @@ def render(
     punch_in: float = typer.Option(
         1.0, "--punch-in", help="Alternating zoom on jump cuts, e.g. 1.08"
     ),
+    template: str = typer.Option(
+        "", "--template", help="Caption template id (see `clipforge templates`)"
+    ),
+    renderer: str = typer.Option("auto", "--renderer", help="auto | remotion | ass"),
+    no_captions: bool = typer.Option(False, "--no-captions", help="Skip captions and hook"),
+    no_hook: bool = typer.Option(False, "--no-hook", help="Captions without the on-screen hook"),
+    brand: str = typer.Option("", "--brand", help="Brand kit id"),
 ) -> None:
     """Cut, reframe and render approved clips to 1080x1920 (no captions yet)."""
     import json
@@ -232,6 +239,17 @@ def render(
     cancel = CancelToken()
     cancel_on_signals(cancel)
     src, tr = load_source(project), load_transcript(project)
+    from clipforge.brand import load_kit
+    from clipforge.captions.stage import CaptionOptions
+
+    kit = load_kit(brand) if brand else None
+    cap_opts = (
+        None
+        if no_captions
+        else CaptionOptions(
+            template or (kit.default_template if kit else "karaoke-pop"), renderer, not no_hook
+        )
+    )
     sig_file = project.path("signals", "signals.json")
     cuts = json.loads(sig_file.read_text()).get("scene_cuts", []) if sig_file.exists() else []
     clips = [c for c in load_clips(project) if clip in ("all", c.id)]
@@ -241,7 +259,7 @@ def render(
     try:
         for c in clips:
             r = render_clip(project, src, tr, c, cleanup, fast, debug, Reporter(project, cancel), cancel,  # type: ignore[arg-type]
-                            not no_faces_check, cuts, punch_in)  # fmt: skip
+                            not no_faces_check, cuts, punch_in, cap_opts, kit)  # fmt: skip
             m = r.measure
             typer.echo(
                 f"{c.id}: {r.path} ({m['clip_seconds']} s clip, rendered in {m['render_seconds']} s)"
@@ -255,6 +273,64 @@ def render(
         if e.action:
             typer.echo("  fix: " + e.action)
         raise typer.Exit(1) from e
+
+
+@app.command()
+def templates() -> None:
+    """List caption templates."""
+    from clipforge.captions.spec import list_templates, load_template
+
+    for tid in list_templates():
+        t = load_template(tid)
+        typer.echo(f"{tid:18s} {t.font.family:18s} {t.description}")
+
+
+brand_app = typer.Typer(help="Brand kits: logo watermark, intro/outro cards, colours, vocabulary.")
+app.add_typer(brand_app, name="brand")
+
+
+@brand_app.command("create")
+def brand_create(
+    kit_id: str = typer.Argument(..., help="Short id, e.g. acme"),
+    name: str = typer.Option("", help="Display name"),
+    logo: str = typer.Option("", help="Path to a PNG logo (transparent background)"),
+    position: str = typer.Option(
+        "top_right", help="top_left | top_right | bottom_left | bottom_right | center"
+    ),
+    text_color: str = typer.Option("", help="Caption text colour, e.g. #FFFFFF"),
+    accent: str = typer.Option("", help="Active-word colour, e.g. #FFB347"),
+    intro: str = typer.Option("", help="Intro card title"),
+    outro: str = typer.Option("", help="Outro card title"),
+    template: str = typer.Option("karaoke-pop", help="Default caption template"),
+    vocabulary: str = typer.Option("", help="Comma-separated brand terms for the ASR glossary"),
+) -> None:
+    """Create or update a brand kit under ~/Clipforge/brand/<id>/."""
+    import shutil
+
+    from clipforge.brand import BrandKit, Card, Logo, brand_dir, save_kit
+
+    kit = BrandKit(id=kit_id, name=name or kit_id, text_color=text_color or None, accent_color=accent or None,
+                   default_template=template, vocabulary=[v.strip() for v in vocabulary.split(",") if v.strip()])  # fmt: skip
+    d = brand_dir() / kit_id
+    d.mkdir(parents=True, exist_ok=True)
+    if logo:
+        shutil.copy(logo, d / "logo.png")
+        kit.logo = Logo(file="logo.png", position=position)  # type: ignore[arg-type]
+    accent_hex = accent or "#FFB347"
+    if intro:
+        kit.intro = Card(title=intro, accent=accent_hex)
+    if outro:
+        kit.outro = Card(title=outro, accent=accent_hex)
+    typer.echo(f"saved {save_kit(kit)}")
+
+
+@brand_app.command("list")
+def brand_list() -> None:
+    """List brand kits."""
+    from clipforge.brand import list_kits
+
+    for k in list_kits():
+        typer.echo(k)
 
 
 if __name__ == "__main__":

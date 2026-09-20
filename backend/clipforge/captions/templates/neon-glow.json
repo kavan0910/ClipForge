@@ -1,0 +1,53 @@
+{
+  "id": "neon-glow",
+  "label": "Neon glow",
+  "description": "Uppercase with a cyan glow over a deep-navy outline; the active word turns magenta.",
+  "font": {
+    "file": "Montserrat.ttf",
+    "family": "Montserrat",
+    "weight": 800,
+    "italic": false
+  },
+  "size": 0.064,
+  "case": "upper",
+  "tracking": 0.03,
+  "line_height": 1.15,
+  "fill": "#EFFFFF",
+  "stroke": {
+    "color": "#001B33",
+    "width": 0.0055
+  },
+  "shadow": {
+    "color": "#00C8FF",
+    "blur": 0.018,
+    "dy": 0.0,
+    "opacity": 0.95
+  },
+  "active": {
+    "mode": "color",
+    "color": "#FF4FD8"
+  },
+  "emphasis": {
+    "color": "#B8FF4F"
+  },
+  "motion": {
+    "kind": "fade",
+    "ms": 160,
+    "easing": "ease_out"
+  },
+  "chunking": {
+    "max_words": 3,
+    "max_chars_per_line": 14,
+    "target_wps": 2.4
+  },
+  "hook": {
+    "size": 0.062,
+    "case": "upper",
+    "fill": "#EFFFFF",
+    "stroke": {
+      "color": "#001B33",
+      "width": 0.005
+    },
+    "box": null
+  }
+}

@@ -4,7 +4,7 @@ Local-first AI clipping studio: one long video in, ready-to-post vertical shorts
 Your video never leaves this machine. Only transcript text and light metadata go to the
 Anthropic API for the editorial step (Phase 2), and the UI says so.
 
-**Status: Phase 3 of 6 (cut, reframe, audio done; captions next). Live-LLM checks still need API credit.** See `docs/PLAN.md` and `docs/checkpoints/`.
+**Status: Phase 4 of 6 done (captions, brand kits, thumbnails, packaging). Phase 5 (review UI) next.** See `docs/PLAN.md` and `docs/checkpoints/`.
 
 ## Setup
 
@@ -16,7 +16,7 @@ make start      # UI + API on http://127.0.0.1:8765 (localhost only)
 ```
 
 CLI: `clipforge run <url|path> --clips 8 --duration 30-60 --preset balanced --steer "..."`, `clipforge curate <project> --mode shorter`,
-`clipforge render <project> --clip c001 --cleanup light [--fast] [--debug]`, `clipforge eval core [--live]`, `clipforge doctor`.
+`clipforge render <project> --clip c001 --template karaoke-pop --brand acme [--renderer ass] [--fast] [--debug]`, `clipforge templates`, `clipforge brand create`, `clipforge eval core [--live]`, `clipforge doctor`.
 
 ## What works today
 
@@ -31,12 +31,18 @@ CLI: `clipforge run <url|path> --clips 8 --duration 30-60 --preset balanced --st
   Clip score is labelled "heuristic", not a virality prediction.
 - `clipforge render`: frame-accurate cuts through an EDL, speaker-aware reframing to 1080x1920 (single, two-shot,
   stacked, screen+cam, blurred fit), filler/pause cleanup, click-free audio at -14 LUFS, one H.264 encode, debug render.
+- Designer captions: 8 templates, word-by-word highlight, hook overlay, brand kits (logo, intro/outro cards), rendered by Remotion
+  (default) or libass (fast fallback), composited inside the single encode; SRT/VTT/ASS sidecars, thumbnail and `metadata.json`.
 - Live progress over SSE, cancel (kills the whole process tree) and resume.
 
 ## Hardware notes
 
 Target: Apple Silicon (M-series) with 16 GB. See `docs/decisions/ADR-001-asr-backend-and-model.md` for
 measured ASR speeds. Default ASR model is `large-v3-turbo`; set `ASR_MODEL=large-v3` for maximum accuracy.
+
+## Fonts and licences
+Bundled fonts are SIL OFL 1.1 (`captions/fonts/LICENSES.md`); run `uv run python scripts/fetch_fonts.py` once. Remotion is free for individuals and
+small teams; larger companies need a licence (`captions/README.md`).
 
 ## Costs
 

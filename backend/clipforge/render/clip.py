@@ -10,7 +10,11 @@ from pathlib import Path
 
 import numpy as np
 
+from clipforge import brand as brandmod
 from clipforge import media
+from clipforge.brand import BrandKit
+from clipforge.captions import stage as capstage
+from clipforge.captions.stage import CaptionOptions
 from clipforge.cleanup import Level, plan_cleanup
 from clipforge.curate.schema import Clip
 from clipforge.edl import EDL
@@ -72,7 +76,8 @@ def run_analysis(
 def render_clip(
     project: Project, source: Source, transcript: Transcript, clip: Clip, level: Level = "light", fast: bool = False,
     debug: bool = False, reporter: Reporter | None = None, cancel: CancelToken | None = None, check_faces: bool = True,
-    scene_cuts: list[float] | None = None, punch_in: float = 1.0,
+    scene_cuts: list[float] | None = None, punch_in: float = 1.0, captions: CaptionOptions | None = None,
+    brand: BrandKit | None = None, brand_root: Path | None = None,
 ) -> RenderResult:  # fmt: skip
     """Full Phase 3 render for one clip; writes clips/<id>/{edl,analysis,reframe,measure}.json + out.mp4."""
     t_start = time.time()
@@ -126,16 +131,74 @@ def render_clip(
     raudio.render_pcm(master, source.selected_audio, edl, pcm, cancel)
     raudio.normalise(pcm, norm, cancel)
 
-    # 5. One video encode
+    # 5. Brand cards, captions, watermark
+    kit_dir = (brand_root or brandmod.brand_dir()) / brand.id if brand else None
+    head = (
+        brandmod.card_frames(brand.intro, brand, kit_dir, fps)
+        if (brand and brand.intro and kit_dir)
+        else []
+    )
+    tail = (
+        brandmod.card_frames(brand.outro, brand, kit_dir, fps)
+        if (brand and brand.outro and kit_dir)
+        else []
+    )
+    offset, tail_s = len(head) / fps, len(tail) / fps
+    final_audio = norm
+    if head or tail:
+        final_audio = d / "audio_final.wav"
+        af = f"adelay={round(offset * 1000)}:all=1,apad=pad_dur={tail_s:.3f}"
+        code, tail_log = run_streaming(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", str(norm), "-af", af,
+                                        "-c:a", "pcm_f32le", str(final_audio)], cancel=cancel)  # fmt: skip
+        if code != 0:
+            raise MediaError("Could not pad the audio for the brand cards.", tail_log[-300:])
+    cap_res = None
+    if captions is not None:
+        report("render", 0.22, note="captions")
+        cap_res = capstage.prepare(
+            d, clip, edl, transcript.words, captions, brand, cancel, 30.0, offset, tail_s, wav
+        )
+        capstage.dump_summary(cap_res, d / "captions_summary.json")
+    overlay = brandmod.watermark_overlay(brand, kit_dir) if (brand and kit_dir) else None
+
+    # 6. One video encode
     out = d / "out.mp4"
     report("render", 0.25, note="rendering video")
-    rvideo.render_video(master, video, edl, solved, norm, out, fast, tonemap_ok,
-                        lambda p: report("render", 0.25 + 0.7 * p), cancel)  # fmt: skip
-    meas = rmeasure.measure_clip(out, solved, edl, check_faces)
+    rvideo.render_video(master, video, edl, solved, final_audio, out, fast, tonemap_ok,
+                        lambda p: report("render", 0.25 + 0.7 * p), cancel, overlay=overlay,
+                        ass_path=cap_res.ass_path if cap_res else None, fonts_dir=capstage.FONTS_DIR,
+                        layers=cap_res.layers if cap_res else None, head=head, tail=tail)  # fmt: skip
+    thumb_info = None
+    if cap_res is not None or True:
+        from clipforge.render import metadata as rmeta
+        from clipforge.render import thumbnail as rthumb
+
+        report("render", 0.96, note="thumbnail")
+        best = rthumb.pick_frame(master, video, edl, solved, d, tonemap_ok)
+        from clipforge.captions.spec import load_template
+
+        tpl = cap_res.template if cap_res else load_template("karaoke-pop")
+        rthumb.compose_title(
+            Path(best["path"]), clip.hook, tpl, d / "thumb.jpg", best.get("face_box")
+        )
+        thumb_info = {k: best[k] for k in ("sharpness", "face", "eyes_open", "total", "candidates")}
+    meas = rmeasure.measure_clip(out, solved, edl, check_faces, offset_frames=len(head))
     meas["render_seconds"] = round(time.time() - t_start, 1)
     meas["clip_seconds"] = round(edl.duration, 2)
     meas["encoder"] = "h264_videotoolbox" if fast else "libx264 slow crf17"
     (d / "measure.json").write_text(json.dumps(meas, indent=1))
+    rmeta.write_metadata(
+        project,
+        clip,
+        edl,
+        d,
+        {
+            "captions": capstage.summary(cap_res) if cap_res else None,
+            "thumbnail": thumb_info,
+            "brand": brand.id if brand else None,
+            "measure": {k: meas[k] for k in ("loudness", "av_drift_frames", "jerk", "layout")},
+        },
+    )
     if debug:
         report("render", 0.97, note="debug render")
         render_debug(source, analysis, solved, edl, d / "debug.mp4", plan)

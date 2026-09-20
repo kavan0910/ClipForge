@@ -176,6 +176,14 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
         </div>
       )}
 
+      {project.status === 'done' && clips.length === 0 && !project.curation_error && (project.transcript?.words ?? 0) > 0 && (
+        <div className="warn" role="status" data-testid="no-clips">
+          <strong>No clips were proposed.</strong> The AI found no self-contained moment of 20–90 seconds in this source.
+          Short sources, or ones that are mostly music or small talk, often have none. Try a longer video, or re-curate with a
+          steering note such as "find the most useful tip".
+        </div>
+      )}
+
       {(cost || clips.length > 0) && <CostMeter cost={cost} />}
 
       {clips.length > 0 && (

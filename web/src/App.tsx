@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { LinkTab } from './components/LinkTab'
+import { CaptionPreview } from './components/CaptionPreview'
 import { ProjectView } from './components/ProjectView'
 import { UploadTab } from './components/UploadTab'
 
@@ -19,6 +20,7 @@ export default function App() {
   const [hash, go] = useHashRoute()
   const [tab, setTab] = useState<Tab>('link')
   const projectId = hash.startsWith('#/p/') ? hash.slice(4) : null
+  const preview = hash.startsWith('#/preview/') ? hash.slice(10).split('/') : null
 
   function onKey(e: React.KeyboardEvent) {
     if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') setTab((t) => (t === 'link' ? 'upload' : 'link'))
@@ -32,7 +34,9 @@ export default function App() {
           Your video stays on this computer. Only transcript text is sent to the Anthropic API for clip selection.
         </span>
       </header>
-      {projectId ? (
+      {preview ? (
+        <CaptionPreview projectId={preview[0]} clipId={preview[1]} />
+      ) : projectId ? (
         <ProjectView id={projectId} onBack={() => go('#/')} />
       ) : (
         <div className="grid gap-5">

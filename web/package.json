@@ -12,9 +12,11 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@remotion/player": "^4.0.526",
     "@tanstack/react-query": "^5.103.1",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "remotion": "^4.0.526"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
@@ -22,11 +24,14 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^24.13.3",
+    "@types/pngjs": "^6.0.5",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
     "jsdom": "^29.1.1",
     "oxlint": "^1.81.0",
+    "pixelmatch": "^7.2.0",
+    "pngjs": "^7.0.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",

@@ -5,6 +5,7 @@
     "lib": ["ES2023", "DOM"],
     "module": "esnext",
     "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
+    "paths": { "@captions/*": ["../captions/src/*"] },
     "allowArbitraryExtensions": true,
     "skipLibCheck": true,
 
@@ -22,5 +23,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src", "../captions/src"]
 }

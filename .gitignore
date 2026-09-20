@@ -13,3 +13,7 @@ eval/fixtures/media/
 web/test-results/
 web/playwright-report/
 scratch/
+captions/fonts/*.ttf
+captions/fonts/*.otf
+.remotion/
+captions/public/fonts

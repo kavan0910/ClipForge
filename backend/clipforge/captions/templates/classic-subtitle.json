@@ -1,0 +1,57 @@
+{
+  "id": "classic-subtitle",
+  "label": "Classic subtitle",
+  "description": "Two-line subtitle on a translucent bar, no highlight.",
+  "font": {
+    "file": "NotoSans.ttf",
+    "family": "Noto Sans",
+    "weight": 500,
+    "italic": false
+  },
+  "size": 0.052,
+  "line_height": 1.22,
+  "fill": "#FFFFFF",
+  "stroke": {
+    "color": "#000000",
+    "width": 0.0
+  },
+  "shadow": {
+    "color": "#000000",
+    "blur": 0.0,
+    "dy": 0.0,
+    "opacity": 0.0
+  },
+  "box": {
+    "color": "#000000",
+    "opacity": 0.62,
+    "radius": 0.006,
+    "pad_x": 0.026,
+    "pad_y": 0.012
+  },
+  "active": {
+    "mode": "none"
+  },
+  "motion": {
+    "kind": "none",
+    "ms": 0,
+    "easing": "linear",
+    "out_kind": "none"
+  },
+  "chunking": {
+    "max_words": 8,
+    "max_chars_per_line": 30,
+    "target_wps": 3.6
+  },
+  "anchor": {
+    "y": 0.7
+  },
+  "hook": {
+    "size": 0.056,
+    "fill": "#FFFFFF",
+    "box": {
+      "color": "#000000",
+      "opacity": 0.62,
+      "radius": 0.006
+    }
+  }
+}

@@ -47,7 +47,7 @@ def audio_click_ratio(path: Path, cut_times: list[float]) -> dict[str, float]:
     return {"cuts": len(cut_times), "worst_ratio": round(worst, 3), "reference_p99": ref}
 
 
-def face_framing(path: Path, solved: Solved) -> dict[str, float]:
+def face_framing(path: Path, solved: Solved, offset_frames: int = 0) -> dict[str, float]:
     """Face-in-crop and eye-line on the rendered frames, measured in an isolated subprocess.
 
     (OpenCV + onnxruntime together in the main process crash at interpreter exit.)
@@ -59,7 +59,7 @@ def face_framing(path: Path, solved: Solved) -> dict[str, float]:
 
     with tempfile.TemporaryDirectory() as tmp:
         layouts, out = Path(tmp) / "layouts.json", Path(tmp) / "out.json"
-        layouts.write_text(json.dumps([f.layout for f in solved.frames]))
+        layouts.write_text(json.dumps(["card"] * offset_frames + [f.layout for f in solved.frames]))
         code, tail = run_streaming(
             [
                 sys.executable,
@@ -87,18 +87,22 @@ def layout_stats(solved: Solved) -> dict[str, float]:
             "layouts": sorted({r[0] for r in runs})}  # type: ignore[dict-item]  # fmt: skip
 
 
-def measure_clip(out: Path, solved: Solved, edl: EDL, check_faces: bool = True) -> dict:
+def measure_clip(
+    out: Path, solved: Solved, edl: EDL, check_faces: bool = True, offset_frames: int = 0
+) -> dict:
     facts = probe_facts(out)
     frame = 1.0 / facts["fps"]
     res = {
         "facts": facts,
         "av_drift_frames": round(abs(facts["video_seconds"] - facts["audio_seconds"]) / frame, 3),
         "loudness": loudness_report(out),
-        "clicks": audio_click_ratio(out, edl.cut_points_out),
+        "clicks": audio_click_ratio(
+            out, [c + offset_frames / facts["fps"] for c in edl.cut_points_out]
+        ),
         "jerk": {k: round(v, 3) for k, v in solved.jerk().items()},
         "layout": layout_stats(solved),
         "cuts_out": [round(c, 3) for c in edl.cut_points_out],
     }
     if check_faces:
-        res["framing"] = face_framing(out, solved)
+        res["framing"] = face_framing(out, solved, offset_frames)
     return res
