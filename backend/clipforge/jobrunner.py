@@ -85,10 +85,13 @@ def run_job(project: Project) -> int:
             precompute_visual(project, s, reporter, cancel)
             return s
 
-        side = [
-            Background(proxy_then_visual, "proxy"),
-            Background(lambda: precompute_events(project, src, reporter, cancel), "events"),
-        ]
+        side_work = [proxy_then_visual, lambda: precompute_events(project, src, reporter, cancel)]
+        if not settings.pipeline_parallel:  # strictly one step at a time
+            for fn in side_work:
+                fn()
+            side = []
+        else:
+            side = [Background(fn, f"side{i}") for i, fn in enumerate(side_work)]
         try:
             t = transcribe(
                 project, src, settings, reporter, cancel, opts.get("language"),

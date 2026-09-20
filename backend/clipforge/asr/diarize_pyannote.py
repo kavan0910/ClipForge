@@ -41,10 +41,29 @@ def diarize_wav(wav: Path, settings: Settings, cancel: CancelToken) -> list[Turn
     return [Turn(seg.start, seg.end, spk) for seg, _, spk in ann.itertracks(yield_label=True)]
 
 
+def load_waveform(wav: Path) -> dict[str, Any]:
+    """Our 16 kHz mono WAV as an in-memory waveform. pyannote then never decodes a file itself, which
+    would need torchcodec and FFmpeg's shared libraries (the usual failure on a fresh Mac)."""
+    import wave
+
+    import numpy as np
+    import torch
+
+    with wave.open(str(wav), "rb") as w:
+        rate, ch, width = w.getframerate(), w.getnchannels(), w.getsampwidth()
+        raw = w.readframes(w.getnframes())
+    if width != 2:
+        raise ASRError("Unexpected audio format for speaker identification.", "Retry the import.")
+    x = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+    x = x.reshape(-1, ch).T  # (channels, samples)
+    return {"waveform": torch.from_numpy(np.ascontiguousarray(x)), "sample_rate": rate}
+
+
 def _run_on_best_device(pipe: Any, wav: Path) -> Any:
     """Prefer Apple's MPS GPU or CUDA; fall back to CPU if a device op is unsupported."""
     import torch
 
+    audio = load_waveform(wav)
     device = (
         "mps"
         if torch.backends.mps.is_available()
@@ -55,7 +74,7 @@ def _run_on_best_device(pipe: Any, wav: Path) -> Any:
     if device != "cpu":
         try:
             pipe.to(torch.device(device))
-            return pipe(str(wav))
+            return pipe(audio)
         except Exception:
             pipe.to(torch.device("cpu"))
-    return pipe(str(wav))
+    return pipe(audio)

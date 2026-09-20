@@ -23,7 +23,7 @@ from clipforge.asr.worker import resolve_model
 from clipforge.config import Settings
 from clipforge.errors import ASRError, MediaError
 from clipforge.models import Probe, Source, Transcript, Word
-from clipforge.parallel import Background
+from clipforge.parallel import Background, Deferred
 from clipforge.procs import CancelToken, run_streaming
 from clipforge.providers.base import Acquired, SourceProvider
 from clipforge.store import Project, canonical_hash
@@ -311,12 +311,14 @@ def transcribe(
 
     def run() -> list[str]:
         # Speaker diarization only needs the audio, so it runs beside the ASR worker (GPU) instead of after it.
-        diar_job: Background[list] | None = None
+        diar_job: Background[list] | Deferred[list] | None = None
         if want_diar:
             from clipforge.asr.diarize_pyannote import diarize_wav
 
             reporter.progress("diarize", 0.0)
-            diar_job = Background(lambda: diarize_wav(wav, settings, cancel), "diarize")
+            diar_job = (Background if settings.pipeline_parallel else Deferred)(
+                lambda: diarize_wav(wav, settings, cancel), "diarize"
+            )
         worker_cfg = {
             "backend": backend, "model": model, "wav": str(wav), "out_dir": str(chunk_dir),
             "chunks": [s.__dict__ for s in specs], "language": language, "prompt": prompt,
@@ -373,7 +375,7 @@ def transcribe(
                 project.emit(
                     "warning",
                     message="Speaker identification was skipped: " + str(e).splitlines()[0][:160],
-                    action="Transcription is unaffected; all speech is treated as one speaker. See the README for the FFmpeg fix.",
+                    action="Transcription is unaffected; all speech is treated as one speaker.",
                 )
                 turns = []
             if turns:

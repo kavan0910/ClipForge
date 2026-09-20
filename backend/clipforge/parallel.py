@@ -28,3 +28,16 @@ class Background[T]:
 
     def done(self) -> bool:
         return not self._thread.is_alive()
+
+
+class Deferred[T]:
+    """Same interface as Background but runs the work when the result is asked for (strictly sequential mode)."""
+
+    def __init__(self, fn: Callable[[], T], name: str = "deferred") -> None:
+        self._fn = fn
+
+    def result(self) -> T:
+        return self._fn()
+
+    def done(self) -> bool:
+        return False
