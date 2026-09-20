@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 
 import numpy as np
 
-MODELS = Path.home() / ".cache" / "clipforge" / "models"
+from clipforge.vision.models import MODELS, ensure_face_models
 
 
 @dataclass(frozen=True)
@@ -53,6 +52,7 @@ class YuNet:
     def __init__(self, score: float = 0.6) -> None:
         import cv2
 
+        ensure_face_models()
         self.cv2 = cv2
         self.det = cv2.FaceDetectorYN.create(
             str(MODELS / "yunet.onnx"), "", (320, 320), score, 0.3, 50
@@ -77,6 +77,7 @@ class Scrfd:
         import cv2
         import onnxruntime as ort
 
+        ensure_face_models()
         self.cv2, self.score, self.size = cv2, score, size
         self.sess = ort.InferenceSession(
             str(MODELS / "buffalo_sc" / "det_500m.onnx"), providers=["CPUExecutionProvider"]

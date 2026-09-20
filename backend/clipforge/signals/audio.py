@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 
 from clipforge.errors import MediaError
+from clipforge.fetch import download
 from clipforge.models import Word
 from clipforge.procs import Cancelled, CancelToken
 
@@ -72,7 +73,7 @@ def ensure_panns_files(
             continue
         part = dest.with_suffix(dest.suffix + ".part")
         try:
-            (fetch or _download)(url, part)
+            (fetch or download)(url, part)
             if part.stat().st_size < min_size:
                 raise OSError(f"{name} downloaded incompletely ({part.stat().st_size} bytes)")
             part.replace(dest)
@@ -82,16 +83,6 @@ def ensure_panns_files(
                 f"Could not download the sound-event model file {name}.",
                 f"Check your internet connection and retry. ({e})",
             ) from e
-
-
-def _download(url: str, dest: Path) -> None:
-    import httpx
-
-    with httpx.stream("GET", url, follow_redirects=True, timeout=httpx.Timeout(30, read=120)) as r:
-        r.raise_for_status()
-        with dest.open("wb") as f:
-            for chunk in r.iter_bytes(1 << 20):
-                f.write(chunk)
 
 
 def event_probabilities(

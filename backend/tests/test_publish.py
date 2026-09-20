@@ -195,3 +195,31 @@ def test_panns_files_download_without_wget(tmp_path: Path):
     with pytest.raises(MediaError):
         audio.ensure_panns_files(tmp_path, short)
     assert not list(tmp_path.glob("*.part"))
+
+
+def test_face_models_download_and_extract(tmp_path: Path):
+    import io
+    import zipfile
+
+    from clipforge.vision import models
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("det_500m.onnx", b"x" * 2_500_000)
+    zbytes = buf.getvalue()
+    calls: list[str] = []
+
+    def fake(url: str, dest: Path) -> None:
+        calls.append(dest.name)
+        dest.write_bytes(b"y" * models.YUNET[1] if "onnx" in dest.name else zbytes)
+
+    import pytest as _pt
+
+    with _pt.MonkeyPatch.context() as mp:
+        mp.setattr(models, "BUFFALO", (models.BUFFALO[0], len(zbytes)))
+        models.ensure_face_models(tmp_path, fake)
+        assert (tmp_path / "yunet.onnx").exists() and (
+            tmp_path / "buffalo_sc" / "det_500m.onnx"
+        ).exists()
+        models.ensure_face_models(tmp_path, fake)  # present: nothing is fetched again
+        assert len(calls) == 2
