@@ -89,12 +89,37 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
   const running = project.status === 'running'
   const activeIndex = STEPS.findIndex((s) => !steps[s.key]?.done)
 
+  const visible = STEPS.filter((s) => !(s.key === 'proxy' && project.source && !project.source.probe.video && !running))
+  const stateOf = (key: string, i: number) => {
+    const st = steps[key]
+    if (st?.done || project.status === 'done') return 'done'
+    if (running && i === activeIndex) return 'active'
+    if (project.status === 'error' && i === activeIndex) return 'error'
+    return 'idle'
+  }
+  const states = visible.map((s) => stateOf(s.key, STEPS.indexOf(s)))
+  const doneCount = states.filter((x) => x === 'done').length
+  const activeStep = visible.find((_, i) => states[i] === 'active')
+  const activePct = activeStep ? (steps[activeStep.key]?.pct ?? 0) : 0
+  const finished = project.status === 'done' || (visible.length > 0 && doneCount === visible.length)
+  const overall = finished ? 1 : Math.min((doneCount + activePct) / visible.length, 0.999)
+  const pctText = `${Math.round(overall * 100)}%`
+  const R = 54, C = 2 * Math.PI * R
+  const headline =
+    finished ? 'Ready to review'
+    : project.status === 'error' ? 'Something went wrong'
+    : project.status === 'cancelled' ? 'Paused'
+    : project.status === 'idle' ? 'Paused'
+    : activeStep?.label ?? 'Starting'
+  const sub = (activeStep && steps[activeStep.key]?.detail) || (running ? 'Working on your video. You can leave this page open.' : '')
+  const ringColour = project.status === 'error' ? 'var(--danger)' : finished ? 'var(--ok)' : 'var(--accent)'
+
   return (
     <div className="grid gap-5">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <button className="btn" onClick={onBack}>← New project</button>
-        <h2 style={{ fontSize: 18, flex: 1, minWidth: 0 }}>{project.source?.title ?? 'Working…'}</h2>
-        <span className="muted" data-testid="status">{project.status}</span>
+        <span className="muted" style={{ fontSize: 13 }}>Project</span>
+        <span className="mono" style={{ fontSize: 13 }} data-testid="status">{project.status}</span>
       </div>
 
       {project.status === 'error' && project.error && (
@@ -107,50 +132,48 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
         </div>
       )}
 
-      <section className="card" aria-label="Progress">
-        <ol className="steps">
-          {STEPS.map((s, i) => {
+      <section aria-label="Progress" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 22, padding: 28, display: 'flex', flexDirection: 'column', gap: 26 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 28, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', width: 132, height: 132, flex: 'none' }} role="progressbar" aria-valuenow={Math.round(overall * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="Overall progress">
+            <svg width="132" height="132" viewBox="0 0 132 132" aria-hidden style={{ display: 'block', transform: 'rotate(-90deg)' }}>
+              <circle cx="66" cy="66" r={R} fill="none" stroke="var(--surface-2)" strokeWidth="10" />
+              <circle cx="66" cy="66" r={R} fill="none" stroke={ringColour} strokeWidth="10" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - overall)} style={{ transition: 'stroke-dashoffset 400ms ease-out' }} />
+            </svg>
+            <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontSize: 28, fontWeight: 650, letterSpacing: '-0.02em' }}>{pctText}</div>
+          </div>
+          <div style={{ flex: '1 1 260px', minWidth: 0 }}>
+            <div className="muted" style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{finished ? 'Done' : running ? 'Now processing' : 'Status'}</div>
+            <h2 style={{ fontSize: 26, margin: '4px 0 6px', lineHeight: 1.2 }}>{headline}</h2>
+            <p className="muted" style={{ margin: 0, overflowWrap: 'anywhere' }}>{sub}</p>
+            {project.source?.title && <p style={{ margin: '10px 0 0', fontSize: 13, overflowWrap: 'anywhere', color: 'var(--muted)' }}>{project.source.title}</p>}
+          </div>
+        </div>
+
+        <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {visible.map((s, i) => {
+            const state = states[i]
             const st = steps[s.key]
-            const done = st?.done || (project.status === 'done')
-            const state = done ? 'done' : running && i === activeIndex ? 'active' : project.status === 'error' && i === activeIndex ? 'error' : 'idle'
-            if (s.key === 'proxy' && project.source && !project.source.probe.video && !running) return null
+            const tone = state === 'done' ? 'var(--ok)' : state === 'active' ? 'var(--accent)' : state === 'error' ? 'var(--danger)' : 'var(--muted)'
             return (
-              <li key={s.key} className="step" data-state={state}>
-                <span className="dot" data-state={state} />
-                <div>
-                  <div>{s.label}</div>
-                  {state === 'active' && (
-                    <>
-                      <div className="bar" style={{ marginTop: 6 }} role="progressbar" aria-valuenow={Math.round((st?.pct ?? 0) * 100)} aria-valuemin={0} aria-valuemax={100}>
-                        <i style={{ width: `${Math.round((st?.pct ?? 0) * 100)}%` }} />
-                      </div>
-                      {st?.detail && <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>{st.detail}</div>}
-                    </>
-                  )}
-                </div>
-                <span className="muted" style={{ fontSize: 13 }}>
-                  {st?.done ? (st.cached ? 'cached' : `${(st.seconds ?? 0).toFixed(1)} s`) : ''}
+              <li key={s.key} data-state={state} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 999, border: `1px solid ${state === 'idle' ? 'var(--border)' : tone}`, background: state === 'active' ? 'var(--surface-2)' : 'transparent', fontSize: 13, color: state === 'idle' ? 'var(--muted)' : 'var(--text)' }}>
+                <span aria-hidden style={{ width: 18, height: 18, borderRadius: 99, display: 'grid', placeItems: 'center', flex: 'none', fontSize: 11, fontWeight: 700, background: state === 'idle' ? 'transparent' : tone, border: `1.5px solid ${tone}`, color: state === 'idle' ? tone : 'var(--bg)' }}>
+                  {state === 'done' ? '✓' : state === 'error' ? '!' : i + 1}
                 </span>
+                <span>{s.label}</span>
+                {st?.done && <span className="muted" style={{ fontSize: 12 }}>{st.cached ? 'cached' : `${(st.seconds ?? 0).toFixed(1)} s`}</span>}
               </li>
             )
           })}
         </ol>
-        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-          {running && (
-            <button className="btn btn-danger" onClick={() => api.cancel(id).then(refresh)}>
-              Cancel
-            </button>
+
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {running && <button className="btn btn-danger" onClick={() => api.cancel(id).then(refresh)}>Cancel</button>}
+          {!finished && (project.status === 'cancelled' || project.status === 'idle') && (
+            <button className="btn btn-primary" onClick={() => api.resume(id).then(() => { void refresh(); listen() })}>Resume</button>
           )}
-          {(project.status === 'cancelled' || project.status === 'idle') && (
-            <button className="btn btn-primary" onClick={() => api.resume(id).then(() => { void refresh(); listen() })}>
-              Resume
-            </button>
-          )}
-          <button className="btn" onClick={() => setShowLogs((v) => !v)} aria-expanded={showLogs}>
-            {showLogs ? 'Hide logs' : 'Logs'}
-          </button>
+          <button className="btn" onClick={() => setShowLogs((v) => !v)} aria-expanded={showLogs}>{showLogs ? 'Hide logs' : 'Logs'}</button>
         </div>
-        {showLogs && <pre className="logs" style={{ marginTop: 12 }}>{logs.join('\n') || 'No events yet.'}</pre>}
+        {showLogs && <pre className="logs" style={{ margin: 0 }}>{logs.join('\n') || 'No events yet.'}</pre>}
       </section>
 
       {[...(project.source?.quality.warnings ?? []), ...warnings].filter((w, i, a) => a.indexOf(w) === i).map((w) => (

@@ -326,11 +326,15 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
 
     # -- built UI ---------------------------------------------------------------
     if (WEB_DIST / "index.html").exists():
-        index = (
-            (WEB_DIST / "index.html")
-            .read_text()
-            .replace("</head>", f'<meta name="clipforge-token" content="{token}"></head>')
-        )
+
+        def render_index() -> (
+            str
+        ):  # read per request so a rebuild of the UI never leaves a stale page
+            return (
+                (WEB_DIST / "index.html")
+                .read_text()
+                .replace("</head>", f'<meta name="clipforge-token" content="{token}"></head>')
+            )
 
         @app.get("/{full_path:path}", include_in_schema=False, response_model=None)
         async def spa(full_path: str) -> Response:
@@ -339,7 +343,7 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
             f = (WEB_DIST / full_path).resolve()
             if full_path and f.is_file() and f.is_relative_to(WEB_DIST.resolve()):
                 return FileResponse(f)
-            return HTMLResponse(index)
+            return HTMLResponse(render_index(), headers={"Cache-Control": "no-cache"})
 
     return app
 
