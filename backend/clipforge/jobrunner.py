@@ -7,6 +7,7 @@ continue from yt-dlp's partial file.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import sys
 import traceback
@@ -15,11 +16,13 @@ from pathlib import Path
 from clipforge.config import get_settings
 from clipforge.curate.run import CurateParams
 from clipforge.errors import ClipforgeError
-from clipforge.pipeline import IngestOptions, Reporter, ingest, transcribe
+from clipforge.parallel import Background
+from clipforge.pipeline import IngestOptions, Reporter, ensure_proxy, ingest, transcribe
 from clipforge.procs import Cancelled, CancelToken, cancel_on_signals
 from clipforge.providers.base import SourceProvider
 from clipforge.providers.path import PathSource
 from clipforge.providers.url import UrlSource
+from clipforge.signals.stage import precompute_events, precompute_visual
 from clipforge.stages import curate_project
 from clipforge.store import Project
 from clipforge.uploads import UploadSource, UploadStore
@@ -65,13 +68,40 @@ def run_job(project: Project) -> int:
             return 0
         provider = build_provider(job["source"], settings)
         src = ingest(
-            project, provider, settings, reporter, cancel, IngestOptions(opts.get("audio_track"))
+            project,
+            provider,
+            settings,
+            reporter,
+            cancel,
+            IngestOptions(opts.get("audio_track")),
+            with_proxy=False,
         )
         project.emit("source_ready", title=src.title, warnings=src.quality.warnings)
-        t = transcribe(
-            project, src, settings, reporter, cancel, opts.get("language"),
-            opts.get("brand_vocabulary"), opts.get("diarize", True),
-        )  # fmt: skip
+
+        # Independent work runs side by side with transcription: the 720p proxy and the shot/motion analysis that
+        # needs it, and the laughter/applause detector. (Speaker diarization runs beside ASR inside transcribe.)
+        def proxy_then_visual():
+            s = ensure_proxy(project, src, reporter, cancel)
+            precompute_visual(project, s, reporter, cancel)
+            return s
+
+        side = [
+            Background(proxy_then_visual, "proxy"),
+            Background(lambda: precompute_events(project, src, reporter, cancel), "events"),
+        ]
+        try:
+            t = transcribe(
+                project, src, settings, reporter, cancel, opts.get("language"),
+                opts.get("brand_vocabulary"), opts.get("diarize", True),
+            )  # fmt: skip
+            for b in side:
+                b.result()  # wait, and surface any failure here
+        except BaseException:
+            cancel.cancel()  # stop side work (its ffmpeg children) when the main path fails or is cancelled
+            for b in side:
+                with contextlib.suppress(BaseException):  # the main error is what gets reported
+                    b.result()
+            raise
         clips = None
         if opts.get("curate", True) and t.words:
             if settings.anthropic_api_key:

@@ -45,19 +45,12 @@ def _write(path: Path, data: object) -> None:
     os.replace(tmp, path)
 
 
-def compute_signals(
-    project: Project,
-    source: Source,
-    transcript: Transcript,
-    reporter: Reporter,
-    cancel: CancelToken,
-    weights: dict[str, float] | None = None,
-) -> Signals:
+def precompute_events(
+    project: Project, source: Source, reporter: Reporter, cancel: CancelToken
+) -> dict:
+    """Laughter/applause (PANNs). Needs only the audio, so it can run while transcription does."""
     dur = source.probe.duration
     sdir = project.path("signals")
-    tkey = canonical_hash(source.content_hash, transcript.duration, len(transcript.words))
-
-    # Laughter/applause (PANNs), cached on its own.
     ev_file = sdir / "events.json"
 
     def do_events() -> list[str]:
@@ -74,28 +67,54 @@ def compute_signals(
         ev_file.exists,
     )  # fmt: skip
     reporter.stage_done("signals_events", rec.seconds, cached)
-    ev = json.loads(ev_file.read_text())
+    return json.loads(ev_file.read_text())
 
-    # Visual signals from the proxy (skipped for audio-only sources).
-    vis_file = sdir / "visual.json"
-    vis: dict[str, list[float]] = {}
-    if source.proxy_path and source.has_video:
-        proxy = Path(source.proxy_path)
 
-        def do_visual() -> list[str]:
-            reporter.progress("signals", 0.4, part="visual")
-            argv = [sys.executable, "-m", "clipforge.signals.visual", str(proxy), str(dur),
-                    str(vis_file)]  # fmt: skip
-            code, tail = run_streaming(argv, cancel=cancel)
-            if code != 0:
-                raise ClipforgeError("Visual analysis failed.", tail[-300:])
-            return [str(vis_file)]
+def precompute_visual(
+    project: Project, source: Source, reporter: Reporter, cancel: CancelToken
+) -> dict[str, list[float]]:
+    """Shot changes and motion from the proxy (skipped for audio-only sources)."""
+    dur = source.probe.duration
+    vis_file = project.path("signals") / "visual.json"
+    if not (source.proxy_path and source.has_video):
+        return {}
+    proxy = Path(source.proxy_path)
 
-        rec, cached = project.run_stage(
-            "signals_visual", SIGNALS_VERSION, source.content_hash, {}, do_visual, vis_file.exists
-        )
-        reporter.stage_done("signals_visual", rec.seconds, cached)
-        vis = json.loads(vis_file.read_text())
+    def do_visual() -> list[str]:
+        reporter.progress("signals", 0.4, part="visual")
+        argv = [
+            sys.executable,
+            "-m",
+            "clipforge.signals.visual",
+            str(proxy),
+            str(dur),
+            str(vis_file),
+        ]
+        code, tail = run_streaming(argv, cancel=cancel)
+        if code != 0:
+            raise ClipforgeError("Visual analysis failed.", tail[-300:])
+        return [str(vis_file)]
+
+    rec, cached = project.run_stage(
+        "signals_visual", SIGNALS_VERSION, source.content_hash, {}, do_visual, vis_file.exists
+    )
+    reporter.stage_done("signals_visual", rec.seconds, cached)
+    return json.loads(vis_file.read_text())
+
+
+def compute_signals(
+    project: Project,
+    source: Source,
+    transcript: Transcript,
+    reporter: Reporter,
+    cancel: CancelToken,
+    weights: dict[str, float] | None = None,
+) -> Signals:
+    dur = source.probe.duration
+    sdir = project.path("signals")
+    tkey = canonical_hash(source.content_hash, transcript.duration, len(transcript.words))
+    ev = precompute_events(project, source, reporter, cancel)  # instant when already cached
+    vis = precompute_visual(project, source, reporter, cancel)
 
     # Cheap features: recomputed whenever the transcript changes.
     wav = Path(source.audio_path or "")

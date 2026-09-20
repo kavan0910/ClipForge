@@ -69,7 +69,7 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
         const key = STAGE_ALIAS[e.stage ?? ''] ?? e.stage
         if (!key) return
         if (e.type === 'progress' && e.stage === 'diarize') {
-          setSteps((s) => ({ ...s, [key]: { ...s[key], pct: s[key]?.pct ?? 1, detail: 'Identifying who is speaking. This is the slowest part on long videos and shows no percentage.', done: false } }))
+          setSteps((s) => ((s[key]?.pct ?? 0) >= 0.999 ? { ...s, [key]: { ...s[key], pct: 1, detail: 'Finishing speaker identification. It runs alongside transcription and shows no percentage.', done: false } } : s))
           return
         }
         if (e.type === 'progress') {

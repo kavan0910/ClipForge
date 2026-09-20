@@ -101,6 +101,7 @@ export interface ClipEdits {
   title?: string | null; hook?: string | null; description?: string | null; hashtags?: string[] | null
   start_word?: number | null; end_word?: number | null; exclude: [number, number][]; cleanup: 'off' | 'light' | 'aggressive'
   restored: number[]; template?: string | null; brand?: string | null; hook_enabled: boolean
+  captions_enabled: boolean; caption_text: Record<string, string>
   layouts: { t0: number; t1: number; layout: string }[]; status?: 'proposed' | 'approved' | 'rejected' | null
 }
 export interface RenderState { state: 'idle' | 'running' | 'done' | 'error' | 'cancelled'; pct: number; note?: string | null; error?: { message: string; action: string } }

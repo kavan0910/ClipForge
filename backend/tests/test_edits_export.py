@@ -219,3 +219,23 @@ def test_model_rule_by_language():
     assert is_english("en-US") and not is_english("hi")
     same = Settings(ASR_MODEL="large-v3-turbo", ASR_MODEL_NON_ENGLISH="same")  # pyright: ignore[reportCallIssue]
     assert pick_model(same, "hi") == "large-v3-turbo"
+
+
+def test_caption_text_and_toggle(tmp_path):
+    from clipforge.captions.spec import load_template
+    from clipforge.captions.timeline import build_timeline
+    from clipforge.edits import ClipEdits, apply_caption_text
+    from clipforge.models import Word
+
+    words = [
+        Word(i=i, w=w, start=i * 0.4, end=i * 0.4 + 0.3, prob=1.0)
+        for i, w in enumerate(["helo", "wrld", "again"])
+    ]
+    e = ClipEdits(
+        caption_text={"0": "Hello", "1": "  "}
+    )  # blank text is ignored, never an empty caption
+    out = apply_caption_text(words, e)
+    assert [w.w for w in out] == ["Hello", "wrld", "again"] and words[0].w == "helo"
+    tpl = load_template("karaoke-pop")
+    tl = build_timeline([], tpl, 3.0, set(), hook="Hook", hook_enabled=True)
+    assert tl.chunks == [] and tl.hook is not None  # captions off: the hook can still show

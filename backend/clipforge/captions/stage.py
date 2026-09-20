@@ -25,6 +25,7 @@ class CaptionOptions:
     template: str = "karaoke-pop"
     renderer: str = "auto"  # auto | remotion | ass
     hook: bool = True
+    words: bool = True  # False: no word-by-word captions (the hook may still show)
     strip_punctuation: bool = False
     mask_profanity: bool = False
     overrides: dict = field(default_factory=dict)  # template token overrides (brand kit)
@@ -62,7 +63,7 @@ def prepare(
     # Shift into the final timeline: brand intro card first, outro card after.
     remapped = [
         w.model_copy(update={"out_start": w.out_start + offset, "out_end": w.out_end + offset})
-        for w in edl.remap_words(words)
+        for w in (edl.remap_words(words) if opts.words else [])
     ]
     tl = build_timeline(
         remapped, tpl, offset + edl.duration + tail, set(clip.emphasis_word_indices),

@@ -45,6 +45,10 @@ class ClipEdits(BaseModel):
     template: str | None = None
     brand: str | None = None
     hook_enabled: bool = True
+    captions_enabled: bool = True
+    caption_text: dict[str, str] = Field(
+        default_factory=dict
+    )  # word index (as text) -> corrected caption text
     layouts: list[LayoutOverride] = Field(default_factory=list)
     status: Literal["proposed", "approved", "rejected"] | None = None
 
@@ -137,3 +141,13 @@ def build_edl(
 
 def layout_overrides(e: ClipEdits) -> list[LayoutSegment]:
     return [LayoutSegment(o.t0, o.t1, o.layout, override=True) for o in e.layouts]
+
+
+def apply_caption_text(words: list[Word], e: ClipEdits) -> list[Word]:
+    """Captions show the editor's corrected text; timing and the transcript itself are untouched."""
+    if not e.caption_text:
+        return words
+    return [
+        w.model_copy(update={"w": e.caption_text[str(w.i)]}) if str(w.i) in e.caption_text and e.caption_text[str(w.i)].strip() else w
+        for w in words
+    ]  # fmt: skip

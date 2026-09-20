@@ -18,6 +18,7 @@ export function ClipEditor({ projectId, clipId, onBack }: { projectId: string; c
   const [speed, setSpeed] = useState(1)
   const [stale, setStale] = useState(false)
   const [starting, setStarting] = useState(false)
+  const [editing, setEditing] = useState<number | null>(null)
   const [saved, setSaved] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [cap, setCap] = useState<{ timeline: Timeline; template: Template } | null>(null)
   const video = useRef<HTMLVideoElement>(null)
@@ -54,7 +55,7 @@ export function ClipEditor({ projectId, clipId, onBack }: { projectId: string; c
   useEffect(() => {
     if (!edits) return
     api.timeline(projectId, clipId, edits.template ?? undefined).then((r) => setCap(r as { timeline: Timeline; template: Template })).catch(() => setCap(null))
-  }, [projectId, clipId, edits?.template, data?.duration, edits?.hook, edits?.hook_enabled]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [projectId, clipId, edits?.template, data?.duration, edits?.hook, edits?.hook_enabled, edits?.captions_enabled, edits?.caption_text]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Poll while a render runs.
   const busy = starting || data?.render.state === 'running'
@@ -121,6 +122,7 @@ export function ClipEditor({ projectId, clipId, onBack }: { projectId: string; c
         '[': setIn, ']': setOut,
         a: () => decide('approved'), r: () => decide('rejected'),
         x: cutSelection, u: restoreSelection,
+        e: () => { const k = sel ? sel[1] : active; if (data && k >= 0) setEditing(data.words[k].i) },
         ArrowRight: () => step(1), ArrowLeft: () => step(-1),
       }
       const fn = map[e.key.length === 1 ? e.key.toLowerCase() : e.key]
@@ -206,9 +208,23 @@ export function ClipEditor({ projectId, clipId, onBack }: { projectId: string; c
               {ctx.map((w, k) => {
                 const inSel = sel && k >= Math.min(sel[0], sel[1]) && k <= Math.max(sel[0], sel[1])
                 const outside = w.i < startIdx || w.i > endIdx
+                const shown = edits.caption_text[String(w.i)] ?? w.w
+                const changed = shown !== w.w
+                if (editing === w.i) {
+                  const commit = (v: string) => {
+                    const ct = { ...edits.caption_text }
+                    if (v.trim() && v.trim() !== w.w) ct[String(w.i)] = v.trim(); else delete ct[String(w.i)]
+                    change({ caption_text: ct }); setEditing(null)
+                  }
+                  return (
+                    <input key={w.i} autoFocus className="field" aria-label={`Caption text for ${w.w}`} defaultValue={shown} style={{ width: Math.max(shown.length + 2, 6) + 'ch', display: 'inline-block', padding: '2px 6px', margin: '0 2px' }}
+                      onBlur={(e) => commit(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') commit((e.target as HTMLInputElement).value); if (e.key === 'Escape') setEditing(null); e.stopPropagation() }} />
+                  )
+                }
                 return (
-                  <button key={w.i} className="word" data-active={k === active} data-cut={!w.kept && !outside} data-outside={outside} data-selected={!!inSel} onClick={(e) => clickWord(k, e.shiftKey)} aria-label={`${w.w} at ${fmtClock(w.start)}${!w.kept && !outside ? ', cut' : ''}`}>
-                    {w.w}
+                  <button key={w.i} className="word" data-active={k === active} data-cut={!w.kept && !outside} data-outside={outside} data-selected={!!inSel} data-edited={changed}
+                    title={changed ? `Original: ${w.w}` : undefined} onClick={(e) => clickWord(k, e.shiftKey)} onDoubleClick={() => setEditing(w.i)} aria-label={`${shown} at ${fmtClock(w.start)}${!w.kept && !outside ? ', cut' : ''}${changed ? ', edited' : ''}`}>
+                    {shown}
                   </button>
                 )
               })}
@@ -270,6 +286,8 @@ export function ClipEditor({ projectId, clipId, onBack }: { projectId: string; c
                 <button key={t} className="btn" role="radio" aria-checked={(edits.template ?? 'karaoke-pop') === t} data-testid={`tpl-${t}`} onClick={() => change({ template: t })}>{t.replace('-', ' ')}</button>
               ))}
             </div>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}><input type="checkbox" data-testid="captions-toggle" checked={edits.captions_enabled} onChange={(e) => change({ captions_enabled: e.target.checked })} /> Show captions (word by word)</label>
+            <p className="muted" style={{ margin: '0 0 8px', fontSize: 12 }}>Fix a caption: double-click a word in the transcript, or select it and press E. This changes the captions only, never the audio.</p>
             <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="checkbox" checked={edits.hook_enabled} onChange={(e) => change({ hook_enabled: e.target.checked })} /> Show the hook at the start</label>
             <input className="field" style={{ marginTop: 8 }} aria-label="Hook text" value={edits.hook ?? c.hook} onChange={(e) => change({ hook: e.target.value })} />
             <textarea className="field" style={{ marginTop: 8 }} rows={2} aria-label="Description" value={edits.description ?? c.description} onChange={(e) => change({ description: e.target.value })} />

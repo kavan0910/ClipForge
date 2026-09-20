@@ -141,7 +141,9 @@ def register(
             edl = clipedits.build_edl(eff, tr.words, e, rms(p), src.probe.duration)
             tpl = load_template(template or e.template or "karaoke-pop")
             tl = build_timeline(
-                edl.remap_words(tr.words),
+                edl.remap_words(clipedits.apply_caption_text(tr.words, e))
+                if e.captions_enabled
+                else [],
                 tpl,
                 edl.duration,
                 set(eff.emphasis_word_indices),

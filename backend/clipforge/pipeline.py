@@ -22,7 +22,8 @@ from clipforge.asr.vad import speech_regions
 from clipforge.asr.worker import resolve_model
 from clipforge.config import Settings
 from clipforge.errors import ASRError, MediaError
-from clipforge.models import Source, Transcript, Word
+from clipforge.models import Probe, Source, Transcript, Word
+from clipforge.parallel import Background
 from clipforge.procs import CancelToken, run_streaming
 from clipforge.providers.base import Acquired, SourceProvider
 from clipforge.store import Project, canonical_hash
@@ -73,8 +74,10 @@ def ingest(
     reporter: Reporter,
     cancel: CancelToken,
     options: IngestOptions | None = None,
+    with_proxy: bool = True,
 ) -> Source:
-    """acquire -> probe/validate -> hash -> 16 kHz wav + 720p proxy. Cached and resumable."""
+    """acquire -> probe/validate -> hash -> 16 kHz wav (+ 720p proxy unless `with_proxy` is False, in which
+    case `ensure_proxy` builds it later, e.g. while transcription runs). Cached and resumable."""
     options = options or IngestOptions()
     acquired_file = project.path("source", "acquired.json")
 
@@ -150,21 +153,11 @@ def ingest(
     )  # fmt: skip
     reporter.stage_done("normalize_audio", rec.seconds, cached)
 
-    proxy_path: str | None = None
-    if pr.video:
-        video = pr.video
-
-        def do_proxy() -> list[str]:
-            media.make_proxy(acq.master, proxy, video, pr.duration, has_zimg,
-                             lambda p: reporter.progress("proxy", p), cancel)  # fmt: skip
-            return [str(proxy)]
-
-        rec, cached = project.run_stage(
-            "normalize_proxy", STAGE_VERSIONS["normalize"], content_hash, {"zimg": has_zimg},
-            do_proxy, proxy.exists,
-        )  # fmt: skip
-        reporter.stage_done("normalize_proxy", rec.seconds, cached)
-        proxy_path = str(proxy)
+    proxy_path: str | None = str(proxy) if (proxy.exists() and pr.video) else None
+    if pr.video and with_proxy:
+        proxy_path = _make_proxy_stage(
+            project, acq.master, pr, content_hash, has_zimg, reporter, cancel
+        )
 
     source = Source(
         id=project.id, kind=acq.kind, title=acq.title, content_hash=content_hash,  # type: ignore[arg-type]
@@ -172,6 +165,52 @@ def ingest(
         platform=acq.platform, origin=acq.origin, ytdlp_version=acq.ytdlp_version,
         proxy_path=proxy_path, audio_path=str(wav),
     )  # fmt: skip
+    project.path("source", "source.json").write_text(source.model_dump_json(indent=2))
+    return source
+
+
+def _make_proxy_stage(
+    project: Project,
+    master: Path,
+    pr: Probe,
+    content_hash: str,
+    has_zimg: bool,
+    reporter: Reporter,
+    cancel: CancelToken,
+) -> str:
+    proxy = project.path("source", "proxy_720p.mp4")
+    video = pr.video
+    assert video is not None
+
+    def do_proxy() -> list[str]:
+        media.make_proxy(master, proxy, video, pr.duration, has_zimg,
+                         lambda p: reporter.progress("proxy", p), cancel)  # fmt: skip
+        return [str(proxy)]
+
+    rec, cached = project.run_stage(
+        "normalize_proxy", STAGE_VERSIONS["normalize"], content_hash, {"zimg": has_zimg}, do_proxy, proxy.exists,
+    )  # fmt: skip
+    reporter.stage_done("normalize_proxy", rec.seconds, cached)
+    return str(proxy)
+
+
+def ensure_proxy(
+    project: Project, source: Source, reporter: Reporter, cancel: CancelToken
+) -> Source:
+    """Build the analysis proxy for a source ingested with `with_proxy=False` and save it into source.json."""
+    if not source.probe.video:
+        return source
+    has_zimg = "zscale" in media.ffmpeg_filters()
+    path = _make_proxy_stage(
+        project,
+        Path(source.master_path),
+        source.probe,
+        source.content_hash,
+        has_zimg,
+        reporter,
+        cancel,
+    )
+    source = source.model_copy(update={"proxy_path": path})
     project.path("source", "source.json").write_text(source.model_dump_json(indent=2))
     return source
 
@@ -271,6 +310,13 @@ def transcribe(
     chunk_dir = project.path("transcript", "chunks", asr_key)
 
     def run() -> list[str]:
+        # Speaker diarization only needs the audio, so it runs beside the ASR worker (GPU) instead of after it.
+        diar_job: Background[list] | None = None
+        if want_diar:
+            from clipforge.asr.diarize_pyannote import diarize_wav
+
+            reporter.progress("diarize", 0.0)
+            diar_job = Background(lambda: diarize_wav(wav, settings, cancel), "diarize")
         worker_cfg = {
             "backend": backend, "model": model, "wav": str(wav), "out_dir": str(chunk_dir),
             "chunks": [s.__dict__ for s in specs], "language": language, "prompt": prompt,
@@ -312,13 +358,11 @@ def transcribe(
             for i, r in enumerate(raw)
         ]
         diarized = False
-        if want_diar and words:
+        if diar_job is not None and words:
             from clipforge.asr.diarize import assign_speakers, label_speakers
-            from clipforge.asr.diarize_pyannote import diarize_wav
 
-            reporter.progress("diarize", 0.0)
             try:
-                turns = diarize_wav(wav, settings, cancel)
+                turns = diar_job.result()
             except ASRError as e:
                 # Diarization is optional: keep single-speaker mode and tell the user why.
                 project.emit("warning", message=e.message, action=e.action)

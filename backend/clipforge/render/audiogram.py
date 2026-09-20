@@ -151,6 +151,9 @@ def render_audiogram(
         brand = brandmod.load_kit(edits.brand, brand_root)
     if captions is not None and not edits.hook_enabled:
         captions = replace(captions, hook=False)
+    if captions is not None and not edits.captions_enabled:
+        captions = replace(captions, words=False)
+    cap_words = clipedits.apply_caption_text(transcript.words, edits)
 
     report("render", 0.1, note="mixing audio")
     pcm, norm = d / "audio_raw.wav", d / "audio_norm.wav"
@@ -172,7 +175,7 @@ def render_audiogram(
     if captions is not None:
         report("render", 0.2, note="captions")
         cap_res = capstage.prepare(
-            d, clip, edl, transcript.words, captions, brand, cancel, FPS, 0.0, 0.0, wav
+            d, clip, edl, cap_words, captions, brand, cancel, FPS, 0.0, 0.0, wav
         )
         capstage.dump_summary(cap_res, d / "captions_summary.json")
 
