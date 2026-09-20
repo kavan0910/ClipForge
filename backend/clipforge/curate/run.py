@@ -23,7 +23,7 @@ from clipforge.signals import combine
 from clipforge.signals.stage import Signals
 from clipforge.store import Project
 
-PROMPT_VERSION = "v2"
+PROMPT_VERSION = "v3"
 PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
 SINGLE_PASS_TOKENS = int(
     os.environ.get("CLIPFORGE_SINGLE_PASS_TOKENS", "30000")
@@ -98,7 +98,7 @@ def _video_context(source: Source, transcript: Transcript, sig: Signals | None) 
 def _instructions(p: CurateParams, n: int, existing: list[Clip], exemplar: Clip | None) -> str:
     lines = [
         f"Select up to {n} clips. Each must run {p.min_duration:.0f}-{p.max_duration:.0f} seconds "
-        "(ideal 30-60). Return fewer rather than weak ones."
+        "(most great clips are 25-55). Return fewer rather than weak ones, but do not stop at one for a long video."
     ]
     if p.steering.strip():
         lines.append(

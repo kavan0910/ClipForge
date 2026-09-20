@@ -146,6 +146,40 @@ def resolve_emphasis(words: Sequence[Word], sentence: Sentence, target: str) -> 
     return None
 
 
+_FILLER_OPEN = {
+    "well", "so", "yeah", "yes", "and", "but", "okay", "ok", "um", "uh", "like", "right", "anyway", "now", "alright",
+    "sure", "hmm", "mhm",
+}  # fmt: skip
+
+
+def weak_opener(sentence: Sentence) -> bool:
+    """A lead-in that only warms up: a fragment of four words or fewer, or a short sentence led by a filler word."""
+    words = re.findall(r"[\w']+", sentence.text.lower())
+    if not words:
+        return True
+    if len(words) <= 4:
+        return True
+    return words[0] in _FILLER_OPEN and len(words) <= 9
+
+
+def trim_lead_in(
+    sentences: Sequence[Sentence], words: Sequence[Word], i: int, j: int, min_seconds: float, keep_from: int | None = None,
+) -> int:  # fmt: skip
+    """Drop up to two weak opening sentences (the 2-second rule), never below `min_seconds` of speech and never
+    past `keep_from` (the sentence that carries the hook's evidence)."""
+    limit = j if keep_from is None else keep_from
+    for _ in range(2):
+        if i >= j or i + 1 > limit:
+            break
+        if not weak_opener(sentences[i]):
+            break
+        remaining = words[sentences[j].word_hi].end - words[sentences[i + 1].word_lo].start
+        if remaining < min_seconds:
+            break
+        i += 1
+    return i
+
+
 @dataclass
 class Resolved:
     proposal: ClipProposal
@@ -167,6 +201,8 @@ def resolve(
     if j < i:
         return None, "end_before_start"
     i, j = extend_to_sentence_boundaries(sentences, i, j)
+    keep_from = idx.get(p.hook_evidence_start)
+    i = trim_lead_in(sentences, words, i, j, params.min_duration + 2.0, keep_from)
     first, last = sentences[i].word_lo, sentences[j].word_hi
     start = snap_start(words, first, rms_db, hop, params.preroll)
     end = snap_end(words, last, rms_db, duration, hop, params.postroll)
@@ -202,6 +238,15 @@ def _minmax(x: Sequence[float], min_range: float = 0.0) -> np.ndarray:
     return (a - a.min()) / max(rng, min_range)
 
 
+def duration_factor(seconds: float) -> float:
+    """Mild preference for the length short-form clips do best at: no penalty from 25 to 55 s, easing off outside it."""
+    if seconds < 25:
+        return 1.0 - 0.006 * (25 - seconds)
+    if seconds > 55:
+        return 1.0 - 0.005 * (seconds - 55)
+    return 1.0
+
+
 def rank_and_select(
     items: Sequence[Resolved],
     signal_scores: Sequence[float],
@@ -219,6 +264,7 @@ def rank_and_select(
     llm = _minmax([r.proposal.overall for r in items], min_range=20.0)
     sig = _minmax(signal_scores, min_range=0.2)
     blend = params.llm_weight * llm + params.signal_weight * sig
+    blend = blend * np.array([duration_factor(r.end - r.start) for r in items])
     tau = max(video_duration / (2 * max(n, 1)), 30.0)
     chosen: list[int] = []
     remaining = set(range(len(items)))

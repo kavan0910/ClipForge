@@ -293,3 +293,44 @@ def test_punch_curve_shape():
     frames = [FrameSpec("fit_blur") for _ in range(300)] + [FrameSpec("single")]
     moved = apply_fit_punch(frames, np.concatenate([z, [1.0]]), 1920, 1080, 0.5)
     assert moved > 20 and frames[int(2.5 * fps)].rects[0].w < 1920 and not frames[-1].rects
+
+
+def test_duration_prior_prefers_the_sweet_spot():
+    from clipforge.curate.postprocess import duration_factor
+
+    assert duration_factor(40) == 1.0 and duration_factor(25) == 1.0 and duration_factor(55) == 1.0
+    assert duration_factor(90) < duration_factor(70) < 1.0
+    assert 0.95 < duration_factor(20) < 1.0
+
+
+def test_lead_in_trim_drops_only_weak_openers():
+    from clipforge.curate.postprocess import trim_lead_in, weak_opener
+    from clipforge.models import Sentence, Word
+
+    texts = ["I think that", "Well so anyway we did it.", "The surprising number is 97 percent of people miss this.",
+             "Here is why that matters for everyone watching today.", "And that is the whole story of how it ended."]  # fmt: skip
+    words, sents, t, k = [], [], 0.0, 0
+    for n, tx in enumerate(texts):
+        lo = k
+        for w in tx.split():
+            words.append(Word(i=k, w=w, start=t, end=t + 0.5, prob=1.0))
+            t += 0.6
+            k += 1
+        sents.append(
+            Sentence(
+                id=f"S{n}",
+                text=tx,
+                start=words[lo].start,
+                end=words[-1].end,
+                word_lo=lo,
+                word_hi=k - 1,
+            )
+        )
+    assert weak_opener(sents[0]) and weak_opener(sents[1]) and not weak_opener(sents[2])
+    assert (
+        trim_lead_in(sents, words, 0, 4, 10.0) == 2
+    )  # both weak openers go, the strong line stays
+    assert (
+        trim_lead_in(sents, words, 0, 4, 10.0, keep_from=1) == 1
+    )  # never past the hook's evidence sentence
+    assert trim_lead_in(sents, words, 0, 4, 200.0) == 0  # never below the minimum length
