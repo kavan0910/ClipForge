@@ -68,6 +68,10 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
         if (e.type === 'warning' && e.message) setWarnings((w) => [...w, e.action ? `${e.message} ${e.action}` : e.message!])
         const key = STAGE_ALIAS[e.stage ?? ''] ?? e.stage
         if (!key) return
+        if (e.type === 'progress' && e.stage === 'diarize') {
+          setSteps((s) => ({ ...s, [key]: { ...s[key], pct: s[key]?.pct ?? 1, detail: 'Identifying who is speaking. This is the slowest part on long videos and shows no percentage.', done: false } }))
+          return
+        }
         if (e.type === 'progress') {
           const detail =
             e.note ? e.note : e.bytes != null && e.total
