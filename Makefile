@@ -3,6 +3,7 @@
 setup:
 	@command -v uv >/dev/null || brew install uv
 	@command -v deno >/dev/null || brew install deno
+	@ffmpeg -hide_banner -filters 2>/dev/null | grep -q zscale || (brew uninstall --ignore-dependencies ffmpeg 2>/dev/null; brew install ffmpeg-full)
 	uv sync
 	cd web && npm install
 	cd captions && npm install
@@ -52,4 +53,4 @@ fixtures:
 	uv run python scripts/fetch_fixtures.py
 
 ffmpeg-full:
-	@echo "Decided in ADR-002; see docs/decisions/"
+	brew uninstall --ignore-dependencies ffmpeg; brew install ffmpeg-full

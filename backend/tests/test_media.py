@@ -81,3 +81,31 @@ def test_disk_space_gate(tmp_path):
 
     with pytest.raises(DiskSpaceError, match="Not enough"):
         media_mod.check_free_space(tmp_path, needed=10**18)
+
+
+@pytest.mark.skipif("zscale" not in media_mod.ffmpeg_filters(), reason="ffmpeg lacks zscale")
+def test_hdr_source_is_detected_and_tonemapped_to_sdr(tmp_path):
+    hdr = tmp_path / "hdr.mp4"
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-y", "-f", "lavfi",
+         "-i", "testsrc2=size=320x240:rate=25:duration=2",
+         "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+         "-vf", "format=yuv420p,setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709,"
+         "zscale=t=smpte2084:p=bt2020:m=bt2020nc:r=tv,format=yuv420p10le",
+         "-c:v", "libx265", "-x265-params",
+         "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
+         "-c:a", "aac", "-shortest", str(hdr)],
+        check=True,
+    )  # fmt: skip
+    pr = media_mod.probe(hdr)
+    assert pr.video and pr.video.hdr and pr.video.color_transfer == "smpte2084"
+    assert any("tone-mapped" in w for w in media_mod.quality_report(pr, pr.audio[0].index).warnings)
+    proxy = tmp_path / "p.mp4"
+    media_mod.make_proxy(hdr, proxy, pr.video, pr.duration, has_zimg=True)
+    out = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+         "stream=pix_fmt,color_transfer,color_primaries", "-of", "csv=p=0", str(proxy)],
+        capture_output=True, text=True, check=True,
+    )  # fmt: skip
+    assert out.stdout.strip().startswith("yuv420p")
+    assert "smpte2084" not in out.stdout  # no longer PQ

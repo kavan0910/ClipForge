@@ -9,7 +9,7 @@ Anthropic API for the editorial step (Phase 2), and the UI says so.
 ## Setup
 
 ```
-make setup      # installs uv + deno (Homebrew), Python deps, web + captions deps, builds the UI
+make setup      # installs uv, deno and ffmpeg-full (Homebrew), Python deps, web + captions deps, builds the UI
 cp .env.example .env   # then add ANTHROPIC_API_KEY (needed from Phase 2)
 make doctor     # checks hardware, ffmpeg, yt-dlp + JS runtime, keys, disk
 make start      # UI + API on http://127.0.0.1:8765 (localhost only)
@@ -49,8 +49,6 @@ and will be measured against the API `usage` fields in Phase 2.
 
 - Speaker diarization needs your Hugging Face account to accept the pyannote terms; until then it degrades to
   single-speaker mode with a visible warning.
-- ffmpeg on this machine lacks libass and zimg, so HDR to SDR tone-mapping and ASS captions are unavailable
-  until the ffmpeg build decision (ADR-002, needed in Phase 3/4). HDR sources are flagged in the quality report.
 - No SQLite index yet: the filesystem manifests are the source of truth; the index arrives with clips in Phase 2.
 - Settings screen (cookies-from-browser, brand kits) arrives in Phase 5; today use `.env`.
 - Live-chat replay download is not implemented yet (the flag is harvested; rate extraction is Phase 2).
