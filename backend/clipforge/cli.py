@@ -153,10 +153,6 @@ def doctor() -> None:
     raise typer.Exit(0 if report.ok else 1)
 
 
-if __name__ == "__main__":
-    app()
-
-
 @app.command(name="eval")
 def eval_(
     suite: str = typer.Argument("core", help="Suite name in eval/suites/"),
@@ -196,3 +192,67 @@ def eval_(
     typer.echo(f"suite {suite}  prompt {report['prompt_version']}  models {report['models']}")
     for k, v in agg.items():
         typer.echo(f"  {k:20s} {v}")
+
+
+@app.command()
+def render(
+    project_id: str = typer.Argument(..., help="Project id"),
+    clip: str = typer.Option("all", "--clip", help="Clip id (c001) or 'all'"),
+    cleanup: str = typer.Option("light", "--cleanup", help="off | light | aggressive"),
+    fast: bool = typer.Option(
+        False, "--fast", help="Hardware encoder (VideoToolbox) instead of libx264"
+    ),
+    debug: bool = typer.Option(
+        False, "--debug", help="Also write a debug render (boxes, tracks, crops)"
+    ),
+    no_faces_check: bool = typer.Option(
+        False, "--no-check-faces", help="Skip re-detecting faces on the output"
+    ),
+    punch_in: float = typer.Option(
+        1.0, "--punch-in", help="Alternating zoom on jump cuts, e.g. 1.08"
+    ),
+) -> None:
+    """Cut, reframe and render approved clips to 1080x1920 (no captions yet)."""
+    import json
+
+    from clipforge.config import get_settings
+    from clipforge.curate.run import load_clips
+    from clipforge.errors import ClipforgeError
+    from clipforge.pipeline import Reporter, load_source
+    from clipforge.procs import Cancelled, CancelToken, cancel_on_signals
+    from clipforge.render.clip import render_clip
+    from clipforge.stages import load_transcript
+    from clipforge.store import Project
+
+    settings = get_settings()
+    project = Project.open(settings.projects_dir, project_id)
+    cancel = CancelToken()
+    cancel_on_signals(cancel)
+    src, tr = load_source(project), load_transcript(project)
+    sig_file = project.path("signals", "signals.json")
+    cuts = json.loads(sig_file.read_text()).get("scene_cuts", []) if sig_file.exists() else []
+    clips = [c for c in load_clips(project) if clip in ("all", c.id)]
+    if not clips:
+        typer.echo("No clips found. Run `clipforge curate` first.")
+        raise typer.Exit(1)
+    try:
+        for c in clips:
+            r = render_clip(project, src, tr, c, cleanup, fast, debug, Reporter(project, cancel), cancel,  # type: ignore[arg-type]
+                            not no_faces_check, cuts, punch_in)  # fmt: skip
+            m = r.measure
+            typer.echo(
+                f"{c.id}: {r.path} ({m['clip_seconds']} s clip, rendered in {m['render_seconds']} s)"
+            )
+            typer.echo(f"   LUFS {m['loudness']['lufs']}  TP {m['loudness']['true_peak_dbtp']} dBTP  "
+                       f"A/V drift {m['av_drift_frames']} frames  jerk p99 {m['jerk']['p99']}  layouts {m['layout']['layouts']}")  # fmt: skip
+    except Cancelled:
+        raise typer.Exit(130) from None
+    except ClipforgeError as e:
+        typer.echo(typer.style("error: ", fg=typer.colors.RED) + e.message)
+        if e.action:
+            typer.echo("  fix: " + e.action)
+        raise typer.Exit(1) from e
+
+
+if __name__ == "__main__":
+    app()

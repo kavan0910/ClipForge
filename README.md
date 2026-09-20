@@ -4,7 +4,7 @@ Local-first AI clipping studio: one long video in, ready-to-post vertical shorts
 Your video never leaves this machine. Only transcript text and light metadata go to the
 Anthropic API for the editorial step (Phase 2), and the UI says so.
 
-**Status: Phase 2 of 6 (signals and curation); the live-LLM checks need API credit.** See `docs/PLAN.md` and `docs/checkpoints/`.
+**Status: Phase 3 of 6 (cut, reframe, audio done; captions next). Live-LLM checks still need API credit.** See `docs/PLAN.md` and `docs/checkpoints/`.
 
 ## Setup
 
@@ -16,7 +16,7 @@ make start      # UI + API on http://127.0.0.1:8765 (localhost only)
 ```
 
 CLI: `clipforge run <url|path> --clips 8 --duration 30-60 --preset balanced --steer "..."`, `clipforge curate <project> --mode shorter`,
-`clipforge eval core [--live]`, `clipforge doctor`.
+`clipforge render <project> --clip c001 --cleanup light [--fast] [--debug]`, `clipforge eval core [--live]`, `clipforge doctor`.
 
 ## What works today
 
@@ -29,6 +29,8 @@ CLI: `clipforge run <url|path> --clips 8 --duration 30-60 --preset balanced --st
 - Signals (energy, speech rate, laughter/applause, shot changes, motion, platform heatmap) and two-stage LLM curation
   (cheap scan, stronger curator) with deterministic boundary snapping, a live cost meter and a hard cost cap.
   Clip score is labelled "heuristic", not a virality prediction.
+- `clipforge render`: frame-accurate cuts through an EDL, speaker-aware reframing to 1080x1920 (single, two-shot,
+  stacked, screen+cam, blurred fit), filler/pause cleanup, click-free audio at -14 LUFS, one H.264 encode, debug render.
 - Live progress over SSE, cancel (kills the whole process tree) and resume.
 
 ## Hardware notes
@@ -54,6 +56,7 @@ and will be measured against the API `usage` fields in Phase 2.
 - Speaker diarization needs your Hugging Face account to accept the pyannote terms; until then it degrades to
   single-speaker mode with a visible warning.
 - The LLM path is verified offline only until the API key has credit (see `docs/checkpoints/phase-2.md`).
+- Active speaker is only verified on synthetic multi-person scenes; see `docs/checkpoints/phase-3.md`.
 - No SQLite index yet: the filesystem manifests are the source of truth; the index arrives with clips in Phase 2.
 - Settings screen (cookies-from-browser, brand kits) arrives in Phase 5; today use `.env`.
 - Live-chat replay download is not implemented yet (the flag is harvested; rate extraction is Phase 2).

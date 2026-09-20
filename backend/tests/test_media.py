@@ -109,3 +109,45 @@ def test_hdr_source_is_detected_and_tonemapped_to_sdr(tmp_path):
     )  # fmt: skip
     assert out.stdout.strip().startswith("yuv420p")
     assert "smpte2084" not in out.stdout  # no longer PQ
+
+
+def test_decode_handles_rotation_vfr_conform_and_hdr_tonemap(media, tmp_path):
+    import numpy as np
+
+    from clipforge.render.video import decode_segment, fps_arg
+
+    pr = media_mod.probe(media["rotated"])
+    assert pr.video
+    frames = list(decode_segment(media["rotated"], pr.video, 0.5, 10, 25.0, True))
+    assert len(frames) == 10 and frames[0].shape == (320, 240, 3)  # rotation applied: h x w swapped
+    assert (
+        fps_arg(24000 / 1001) == "24000/1001"
+        and fps_arg(25.0) == "25"
+        and fps_arg(29.97) == "30000/1001"
+    )
+
+    if "zscale" in media_mod.ffmpeg_filters():
+        hdr = tmp_path / "hdr.mp4"
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=320x240:rate=25:duration=1",
+             "-vf", "format=yuv420p,setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709,"
+             "zscale=t=smpte2084:p=bt2020:m=bt2020nc:r=tv,format=yuv420p10le",
+             "-c:v", "libx265", "-x265-params", "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc", str(hdr)],
+            check=True,
+        )  # fmt: skip
+        from clipforge.models import VideoInfo
+
+        ref = tmp_path / "ref.mp4"  # the same picture as plain SDR BT.709
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=320x240:rate=25:duration=1",
+             "-vf", "format=yuv420p,setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709",
+             "-c:v", "libx264", str(ref)],
+            check=True,
+        )  # fmt: skip
+        vi = VideoInfo(codec="hevc", width=320, height=240, fps=25, variable_fps=False, hdr=True)
+        vs = VideoInfo(codec="h264", width=320, height=240, fps=25, variable_fps=False)
+        sdr_ref = np.stack(list(decode_segment(ref, vs, 0.0, 5, 25.0, True))).astype(float)
+        tonemapped = np.stack(list(decode_segment(hdr, vi, 0.0, 5, 25.0, True))).astype(float)
+        untouched = np.stack(list(decode_segment(hdr, vi, 0.0, 5, 25.0, False))).astype(float)
+        # Colours must come back close to the SDR original; skipping tone-mapping is much worse.
+        assert np.abs(tonemapped - sdr_ref).mean() < np.abs(untouched - sdr_ref).mean() * 0.6
