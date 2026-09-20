@@ -8,9 +8,23 @@ import signal
 import subprocess
 import sys
 import threading
+from pathlib import Path
 from typing import Any
 
 from clipforge.store import Project
+
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+
+
+def _child_env() -> dict[str, str]:
+    """Children must find `clipforge` even if the editable install's .pth is missing or stale (uvicorn only
+    knows the package through --app-dir)."""
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(
+        p for p in (str(BACKEND_DIR), env.get("PYTHONPATH", "")) if p
+    )
+    return env
+
 
 TERMINAL = {"job_done", "job_error", "job_cancelled"}
 
@@ -49,7 +63,7 @@ def start(project: Project, spec: dict[str, Any] | None = None) -> int:
     log = project.path("logs", "job.log").open("ab")
     proc = subprocess.Popen(
         [sys.executable, "-m", "clipforge.jobrunner", str(project.root)],
-        stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True,
+        stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True, env=_child_env(),
     )  # fmt: skip
     _pid_file(project).write_text(str(proc.pid))
     # Reap the child when it exits so a finished job is not seen as alive (zombie).
@@ -122,7 +136,7 @@ def start_render(project: Project, clip_id: str, options: dict[str, Any]) -> int
     log = (d / "render.log").open("ab")
     proc = subprocess.Popen(
         [sys.executable, "-m", "clipforge.renderjob", str(project.root), clip_id],
-        stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True,
+        stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True, env=_child_env(),
     )  # fmt: skip
     render_pid_file(project, clip_id).write_text(str(proc.pid))
     threading.Thread(target=proc.wait, daemon=True).start()
