@@ -80,7 +80,11 @@ def run_job(project: Project) -> int:
                     preset=opts.get("preset", "balanced"), language=opts.get("language"),
                     min_duration=opts.get("min_duration", 20.0), max_duration=opts.get("max_duration", 90.0),
                 )  # fmt: skip
-                clips = curate_project(project, settings, reporter, cancel, params).clips
+                try:
+                    clips = curate_project(project, settings, reporter, cancel, params).clips
+                except ClipforgeError as e:
+                    # Isolated failure: the transcript and signals are still valid and usable.
+                    project.emit("stage_error", stage="curate", **e.to_dict())
             else:
                 project.emit("warning", message="No Anthropic API key: clip selection was skipped.",
                              action="Add ANTHROPIC_API_KEY to .env and use Re-curate.")  # fmt: skip

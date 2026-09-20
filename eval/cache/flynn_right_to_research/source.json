@@ -1,0 +1,62 @@
+{
+ "id": "fx-flynn-right-",
+ "kind": "path",
+ "title": "flynn_right_to_research",
+ "content_hash": "9adbdb5c6aa4c0a481c0255b36acf678",
+ "master_path": "",
+ "probe": {
+  "duration": 2020.376,
+  "format_name": "matroska,webm",
+  "size": 108976235,
+  "bit_rate": 431508,
+  "video": {
+   "codec": "vp9",
+   "width": 1280,
+   "height": 720,
+   "fps": 25.0,
+   "variable_fps": false,
+   "pix_fmt": "yuv420p",
+   "bit_rate": null,
+   "rotation": 0,
+   "sar": "1:1",
+   "hdr": false,
+   "color_transfer": "bt709",
+   "color_primaries": "bt709"
+  },
+  "audio": [
+   {
+    "index": 1,
+    "codec": "opus",
+    "channels": 2,
+    "sample_rate": 48000,
+    "language": "eng",
+    "title": null,
+    "default": true
+   }
+  ]
+ },
+ "selected_audio": 1,
+ "quality": {
+  "resolution": "1280x720",
+  "fps": 25.0,
+  "video_bitrate_kbps": null,
+  "audio_summary": "opus, 2 ch, 48000 Hz",
+  "warnings": [
+   "Source is 1280x720. A vertical crop is only about 405 px wide, so clips will be soft; a higher-resolution source (1440p or above) is recommended."
+  ]
+ },
+ "platform": {
+  "title": null,
+  "description": null,
+  "channel": null,
+  "tags": [],
+  "chapters": [],
+  "heatmap": [],
+  "chat_replay": false
+ },
+ "origin": "/Users/kavan/Desktop/ClipForge/eval/fixtures/media/flynn_right_to_research.webm",
+ "ytdlp_version": null,
+ "proxy_path": null,
+ "audio_path": null,
+ "created_at": "2026-09-20T01:26:08.156803Z"
+}

@@ -1,0 +1,17 @@
+{
+  "video": "fbi_podcast_fugitive",
+  "genre": "podcast",
+  "labeller": "claude (hand-labelled from the transcript; subjective, review before trusting)",
+  "good": [
+    {"start": 111.3, "end": 151.8, "note": "How MS-13 began in Los Angeles and turned violent"},
+    {"start": 153.2, "end": 199.2, "note": "What the gang's full name and the number 13 mean"},
+    {"start": 234.5, "end": 295.7, "note": "Violence as a business model: fear, control, retention"},
+    {"start": 467.6, "end": 509.2, "note": "Court escape attempt that killed four officers; the reward"},
+    {"start": 602.4, "end": 644.7, "note": "Attack the leadership and the recruitment of vulnerable young people"}
+  ],
+  "bad": [
+    {"start": 6.8, "end": 64.3, "note": "Episode teaser and intro boilerplate"},
+    {"start": 510.5, "end": 575.2, "note": "How to submit a tip (call-to-action logistics)"},
+    {"start": 696.4, "end": 739.3, "note": "Outro: links and subscribe"}
+  ]
+}

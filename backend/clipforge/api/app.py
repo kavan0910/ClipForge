@@ -218,6 +218,16 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
             data["transcript"]["words"] = len(t["words"])
             data["transcript"]["sentences"] = t["sentences"]
         events, _ = p.read_events(0)
+        stage_err = next(
+            (
+                e
+                for e in reversed(events)
+                if e["type"] in {"stage_error", "clips_ready", "job_started"}
+            ),
+            None,
+        )
+        if stage_err and stage_err["type"] == "stage_error":
+            data["curation_error"] = {k: stage_err.get(k) for k in ("code", "message", "action")}
         err = next((e for e in reversed(events) if e["type"] == "job_error"), None)
         if err and data["status"] == "error":
             data["error"] = {k: err.get(k) for k in ("code", "message", "action")}

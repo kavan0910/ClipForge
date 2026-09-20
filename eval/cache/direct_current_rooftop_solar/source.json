@@ -1,0 +1,62 @@
+{
+ "id": "fx-direct-curre",
+ "kind": "path",
+ "title": "direct_current_rooftop_solar",
+ "content_hash": "6dba13fe40cf955513765153d89c4e88",
+ "master_path": "",
+ "probe": {
+  "duration": 1476.486,
+  "format_name": "matroska,webm",
+  "size": 54017697,
+  "bit_rate": 292682,
+  "video": {
+   "codec": "vp8",
+   "width": 854,
+   "height": 480,
+   "fps": 23.976,
+   "variable_fps": false,
+   "pix_fmt": "yuv420p",
+   "bit_rate": null,
+   "rotation": 0,
+   "sar": "1:1",
+   "hdr": false,
+   "color_transfer": null,
+   "color_primaries": null
+  },
+  "audio": [
+   {
+    "index": 1,
+    "codec": "vorbis",
+    "channels": 2,
+    "sample_rate": 48000,
+    "language": "eng",
+    "title": null,
+    "default": true
+   }
+  ]
+ },
+ "selected_audio": 1,
+ "quality": {
+  "resolution": "854x480",
+  "fps": 23.976,
+  "video_bitrate_kbps": null,
+  "audio_summary": "vorbis, 2 ch, 48000 Hz",
+  "warnings": [
+   "Source is 854x480. A vertical crop is only about 270 px wide, so clips will be soft; a higher-resolution source (1440p or above) is recommended."
+  ]
+ },
+ "platform": {
+  "title": null,
+  "description": null,
+  "channel": null,
+  "tags": [],
+  "chapters": [],
+  "heatmap": [],
+  "chat_replay": false
+ },
+ "origin": "/Users/kavan/Desktop/ClipForge/eval/fixtures/media/direct_current_rooftop_solar.webm",
+ "ytdlp_version": null,
+ "proxy_path": null,
+ "audio_path": null,
+ "created_at": "2026-09-20T01:15:01.880716Z"
+}

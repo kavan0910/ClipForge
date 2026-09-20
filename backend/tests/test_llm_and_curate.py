@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 import pytest
 
@@ -224,3 +225,25 @@ def test_missing_key_is_an_actionable_error(tmp_path, monkeypatch):
         curate(
             project, src, tr, None, Settings.model_construct(anthropic_api_key=None), CurateParams()
         )  # type: ignore[call-arg]
+
+
+def test_no_credit_is_reported_as_an_actionable_error(tmp_path):
+    import anthropic
+    import httpx
+
+    class Broke:
+        class messages:
+            @staticmethod
+            def create(**_req):
+                resp: Any = httpx.Response(400, request=httpx.Request("POST", "https://x"))
+                raise anthropic.BadRequestError(
+                    "Your credit balance is too low to access the Anthropic API.",
+                    response=resp,
+                    body=None,
+                )
+
+    llm = LLMClient("k", CostMeter(1.0), tmp_path / "r", "v1", client=Broke())
+    with pytest.raises(LLMError, match="no credit") as e:
+        llm.structured(stage="s", model="claude-sonnet-5", system="s", blocks=[Block("x")],
+                       model_cls=ScanResult, tool_name="t")  # fmt: skip
+    assert "Plans & Billing" in e.value.action

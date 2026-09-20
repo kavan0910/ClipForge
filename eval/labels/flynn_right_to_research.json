@@ -1,0 +1,17 @@
+{
+  "video": "flynn_right_to_research",
+  "genre": "lecture",
+  "labeller": "claude (hand-labelled from the transcript; subjective, review before trusting)",
+  "good": [
+    {"start": 443.1, "end": 518.5, "note": "From the 1886 quotation exception to the flexible three-step test"},
+    {"start": 603.9, "end": 663.6, "note": "Google constantly copies the internet: search is text and data mining"},
+    {"start": 700.5, "end": 789.1, "note": "An AI firm flagged the outbreak early; text mining and fast vaccines"},
+    {"start": 1744.0, "end": 1795.0, "note": "US fair use is open because of the words 'such as'; Singapore and Germany compared"},
+    {"start": 1869.4, "end": 1890.8, "note": "Hungary lets you copy a whole book by hand but not photocopy it (Hungarian officials laughed)"}
+  ],
+  "bad": [
+    {"start": 25.5, "end": 59.7, "note": "Series housekeeping and next week's theme"},
+    {"start": 1313.2, "end": 1369.8, "note": "Methodology and database caveats"},
+    {"start": 1937.5, "end": 1973.8, "note": "Wrap-up and next week teaser"}
+  ]
+}

@@ -1,0 +1,60 @@
+{
+ "id": "fx-udio-tutoria",
+ "kind": "path",
+ "title": "udio_tutorial",
+ "content_hash": "b4d0e529104e93ffb09a202fbf99e92d",
+ "master_path": "",
+ "probe": {
+  "duration": 661.474,
+  "format_name": "matroska,webm",
+  "size": 58250466,
+  "bit_rate": 704492,
+  "video": {
+   "codec": "av1",
+   "width": 1920,
+   "height": 1080,
+   "fps": 30.0,
+   "variable_fps": false,
+   "pix_fmt": "yuv420p",
+   "bit_rate": null,
+   "rotation": 0,
+   "sar": "1:1",
+   "hdr": false,
+   "color_transfer": "bt709",
+   "color_primaries": "bt709"
+  },
+  "audio": [
+   {
+    "index": 1,
+    "codec": "opus",
+    "channels": 2,
+    "sample_rate": 48000,
+    "language": null,
+    "title": null,
+    "default": true
+   }
+  ]
+ },
+ "selected_audio": 1,
+ "quality": {
+  "resolution": "1920x1080",
+  "fps": 30.0,
+  "video_bitrate_kbps": null,
+  "audio_summary": "opus, 2 ch, 48000 Hz",
+  "warnings": []
+ },
+ "platform": {
+  "title": null,
+  "description": null,
+  "channel": null,
+  "tags": [],
+  "chapters": [],
+  "heatmap": [],
+  "chat_replay": false
+ },
+ "origin": "/Users/kavan/Desktop/ClipForge/eval/fixtures/media/udio_tutorial.webm",
+ "ytdlp_version": null,
+ "proxy_path": null,
+ "audio_path": null,
+ "created_at": "2026-09-20T01:04:52.344766Z"
+}

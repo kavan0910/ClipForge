@@ -66,6 +66,7 @@ export interface ProjectData {
   source?: { title: string; kind: string; quality: Quality; probe: { duration: number; video: unknown | null } }
   transcript?: { language: string; asr_model: string; duration: number; words: number; sentences: SentenceRow[]; diarized: boolean }
   error?: { code: string; message: string; action: string }
+  curation_error?: { code: string; message: string; action: string }
 }
 
 export interface ClipRow {
@@ -195,7 +196,7 @@ export interface ProgressEvent {
 export function subscribe(id: string, onEvent: (e: ProgressEvent) => void, onEnd: () => void): () => void {
   const es = new EventSource(`/api/projects/${id}/events`)
   const handler = (m: MessageEvent) => onEvent(JSON.parse(m.data))
-  for (const t of ['job_started', 'progress', 'stage_done', 'probe', 'source_ready', 'warning', 'cost', 'clips_ready', 'job_done', 'job_error', 'job_cancelled']) {
+  for (const t of ['job_started', 'progress', 'stage_done', 'probe', 'source_ready', 'warning', 'cost', 'clips_ready', 'stage_error', 'job_done', 'job_error', 'job_cancelled']) {
     es.addEventListener(t, handler as EventListener)
   }
   for (const t of ['job_done', 'job_error', 'job_cancelled']) {

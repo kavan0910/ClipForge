@@ -1,0 +1,19 @@
+{
+  "video": "direct_current_rooftop_solar",
+  "genre": "podcast",
+  "labeller": "claude (hand-labelled from the transcript; subjective, review before trusting)",
+  "good": [
+    {"start": 173.3, "end": 219.1, "note": "Funny bit: 'This American Light Bulb' parody pitch"},
+    {"start": 347.3, "end": 386.7, "note": "Carter: the moral equivalent of war and the new Department of Energy"},
+    {"start": 722.5, "end": 789.8, "note": "Solar panels installed but the bill goes up 10x: the meter is not talking to the utility"},
+    {"start": 893.9, "end": 954.5, "note": "Why soft costs stay high: confusing bids and 18,000 permit jurisdictions"},
+    {"start": 1082.4, "end": 1119.2, "note": "Upstate New York is a surprisingly good solar market (600% growth)"},
+    {"start": 1150.1, "end": 1224.0, "note": "Solarize campaigns: workshops, transparency and neighbourly peer pressure"},
+    {"start": 1274.8, "end": 1315.8, "note": "The $10M Race to 7-Day Solar prize"}
+  ],
+  "bad": [
+    {"start": 5.0, "end": 78.3, "note": "Why the Department of Energy is doing a podcast (meta intro)"},
+    {"start": 411.2, "end": 464.4, "note": "Behind-the-scenes banter about an unusable segment"},
+    {"start": 1411.5, "end": 1465.2, "note": "Credits and thanks"}
+  ]
+}

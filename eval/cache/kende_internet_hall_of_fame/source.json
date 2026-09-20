@@ -1,0 +1,60 @@
+{
+ "id": "kende1",
+ "kind": "path",
+ "title": "kende_internet_hall_of_fame",
+ "content_hash": "2932ff3af1922edc26acd07ec0265412",
+ "master_path": "",
+ "probe": {
+  "duration": 234.924,
+  "format_name": "matroska,webm",
+  "size": 110874812,
+  "bit_rate": 3775682,
+  "video": {
+   "codec": "vp9",
+   "width": 1920,
+   "height": 1080,
+   "fps": 23.974,
+   "variable_fps": false,
+   "pix_fmt": "yuv420p",
+   "bit_rate": null,
+   "rotation": 0,
+   "sar": "1:1",
+   "hdr": false,
+   "color_transfer": null,
+   "color_primaries": null
+  },
+  "audio": [
+   {
+    "index": 1,
+    "codec": "opus",
+    "channels": 2,
+    "sample_rate": 48000,
+    "language": null,
+    "title": null,
+    "default": true
+   }
+  ]
+ },
+ "selected_audio": 1,
+ "quality": {
+  "resolution": "1920x1080",
+  "fps": 23.974,
+  "video_bitrate_kbps": null,
+  "audio_summary": "opus, 2 ch, 48000 Hz",
+  "warnings": []
+ },
+ "platform": {
+  "title": null,
+  "description": null,
+  "channel": null,
+  "tags": [],
+  "chapters": [],
+  "heatmap": [],
+  "chat_replay": false
+ },
+ "origin": "/Users/kavan/Desktop/ClipForge/eval/fixtures/media/kende_internet_hall_of_fame.webm",
+ "ytdlp_version": null,
+ "proxy_path": null,
+ "audio_path": null,
+ "created_at": "2026-09-20T00:36:59.449391Z"
+}

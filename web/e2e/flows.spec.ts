@@ -15,6 +15,12 @@ async function projectId(page: import('@playwright/test').Page) {
   return page.url().split('#/p/')[1]
 }
 
+// Curation either proposes clips, or fails in isolation with a clear, actionable message
+// (for example no API credit). The transcript must never be lost either way.
+async function expectCurationOutcome(page: import('@playwright/test').Page) {
+  await expect(page.getByTestId('clips-ready').or(page.getByTestId('curation-error'))).toBeVisible({ timeout: 90_000 })
+}
+
 async function sourceShape(request: APIRequestContext, id: string) {
   const p = await (await request.get(`/api/projects/${id}`)).json()
   const keys = (o: Record<string, unknown>): string[] => Object.keys(o).sort()
@@ -54,6 +60,7 @@ test('link flow: a bad link explains itself; a real YouTube link becomes a trans
   await expect(page.getByTestId('transcript-ready')).toBeVisible({ timeout: 5 * 60_000 })
   await expect(page.getByTestId('status')).toHaveText('done')
   await expect(page.getByTestId('quality')).toContainText('fps')
+  await expectCurationOutcome(page)
 })
 
 test('upload flow: a real file streams in chunks and becomes a transcript', async ({ page }) => {
@@ -66,6 +73,7 @@ test('upload flow: a real file streams in chunks and becomes a transcript', asyn
   ids.upload = await projectId(page)
   await expect(page.getByTestId('transcript-ready')).toBeVisible({ timeout: 4 * 60_000 })
   await expect(page.getByTestId('status')).toHaveText('done')
+  await expectCurationOutcome(page)
 })
 
 test('both sources produce the same Source and transcript schema', async ({ request }) => {

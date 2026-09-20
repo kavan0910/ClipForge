@@ -166,6 +166,16 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
         </section>
       )}
 
+      {project.curation_error && clips.length === 0 && (
+        <div className="alert" role="alert" data-testid="curation-error">
+          <strong>Clip selection did not run: {project.curation_error.message}</strong>
+          {project.curation_error.action && <p style={{ margin: '4px 0 0' }}>{project.curation_error.action}</p>}
+          <button className="btn" style={{ marginTop: 8 }} onClick={() => api.recurate(id, { mode: 'fresh' }).then(() => { void refresh(); listen() })}>
+            Retry clip selection
+          </button>
+        </div>
+      )}
+
       {(cost || clips.length > 0) && <CostMeter cost={cost} />}
 
       {clips.length > 0 && (

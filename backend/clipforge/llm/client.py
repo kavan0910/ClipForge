@@ -160,6 +160,11 @@ class LLMClient:
                 resp = self._call(stage if attempt == 0 else stage + "_repair", model, req)
             except anthropic.BadRequestError as e:
                 msg = str(e).lower()
+                if "credit balance" in msg:
+                    raise LLMError(
+                        "Your Anthropic account has no credit left.",
+                        "Add credits under Plans & Billing at console.anthropic.com, then retry.",
+                    ) from e
                 if mode == "json" and any(
                     k in msg for k in ("output_config", "format", "schema", "structured")
                 ):

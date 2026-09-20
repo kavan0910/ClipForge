@@ -1,0 +1,62 @@
+{
+ "id": "fx-fbi-podcast-",
+ "kind": "path",
+ "title": "fbi_podcast_fugitive",
+ "content_hash": "81f141c213c2a5b511fd4f81afac2989",
+ "master_path": "",
+ "probe": {
+  "duration": 754.792,
+  "format_name": "matroska,webm",
+  "size": 48399830,
+  "bit_rate": 512987,
+  "video": {
+   "codec": "vp8",
+   "width": 1280,
+   "height": 720,
+   "fps": 24.0,
+   "variable_fps": false,
+   "pix_fmt": "yuv420p",
+   "bit_rate": null,
+   "rotation": 0,
+   "sar": "1:1",
+   "hdr": false,
+   "color_transfer": "bt709",
+   "color_primaries": "bt709"
+  },
+  "audio": [
+   {
+    "index": 1,
+    "codec": "vorbis",
+    "channels": 2,
+    "sample_rate": 44100,
+    "language": "eng",
+    "title": "Stereo",
+    "default": true
+   }
+  ]
+ },
+ "selected_audio": 1,
+ "quality": {
+  "resolution": "1280x720",
+  "fps": 24.0,
+  "video_bitrate_kbps": null,
+  "audio_summary": "vorbis, 2 ch, 44100 Hz",
+  "warnings": [
+   "Source is 1280x720. A vertical crop is only about 405 px wide, so clips will be soft; a higher-resolution source (1440p or above) is recommended."
+  ]
+ },
+ "platform": {
+  "title": null,
+  "description": null,
+  "channel": null,
+  "tags": [],
+  "chapters": [],
+  "heatmap": [],
+  "chat_replay": false
+ },
+ "origin": "/Users/kavan/Desktop/ClipForge/eval/fixtures/media/fbi_podcast_fugitive.webm",
+ "ytdlp_version": null,
+ "proxy_path": null,
+ "audio_path": null,
+ "created_at": "2026-09-20T01:09:40.247269Z"
+}

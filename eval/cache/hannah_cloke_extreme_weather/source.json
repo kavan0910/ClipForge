@@ -1,0 +1,60 @@
+{
+ "id": "fx-hannah-cloke",
+ "kind": "path",
+ "title": "hannah_cloke_extreme_weather",
+ "content_hash": "1bec6d5501239205419e491d4111fea0",
+ "master_path": "",
+ "probe": {
+  "duration": 626.017,
+  "format_name": "matroska,webm",
+  "size": 85493260,
+  "bit_rate": 1092535,
+  "video": {
+   "codec": "vp9",
+   "width": 1920,
+   "height": 1080,
+   "fps": 25.0,
+   "variable_fps": false,
+   "pix_fmt": "yuv420p",
+   "bit_rate": null,
+   "rotation": 0,
+   "sar": "1:1",
+   "hdr": false,
+   "color_transfer": "bt709",
+   "color_primaries": "bt709"
+  },
+  "audio": [
+   {
+    "index": 1,
+    "codec": "opus",
+    "channels": 2,
+    "sample_rate": 48000,
+    "language": "eng",
+    "title": null,
+    "default": true
+   }
+  ]
+ },
+ "selected_audio": 1,
+ "quality": {
+  "resolution": "1920x1080",
+  "fps": 25.0,
+  "video_bitrate_kbps": null,
+  "audio_summary": "opus, 2 ch, 48000 Hz",
+  "warnings": []
+ },
+ "platform": {
+  "title": null,
+  "description": null,
+  "channel": null,
+  "tags": [],
+  "chapters": [],
+  "heatmap": [],
+  "chat_replay": false
+ },
+ "origin": "/Users/kavan/Desktop/ClipForge/eval/fixtures/media/hannah_cloke_extreme_weather.webm",
+ "ytdlp_version": null,
+ "proxy_path": null,
+ "audio_path": null,
+ "created_at": "2026-09-20T01:00:49.202689Z"
+}
