@@ -63,6 +63,14 @@ class ResolveRequest(BaseModel):
     url: str
 
 
+class Recurate(BaseModel):
+    mode: Literal["fresh", "more_like", "shorter", "different_topic"] = "fresh"
+    reference_clip_id: str | None = None
+    steering: str = ""
+    clips: int | None = None
+    preset: str = "balanced"
+
+
 class UploadCreate(BaseModel):
     filename: str
     size: int
@@ -275,13 +283,6 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
         await run_in_threadpool(jobs.cancel, p)
         await run_in_threadpool(p.delete)
         return {"ok": True}
-
-    class Recurate(BaseModel):
-        mode: Literal["fresh", "more_like", "shorter", "different_topic"] = "fresh"
-        reference_clip_id: str | None = None
-        steering: str = ""
-        clips: int | None = None
-        preset: str = "balanced"
 
     @app.get("/api/projects/{project_id}/clips")
     async def list_clips(project_id: str) -> dict[str, Any]:

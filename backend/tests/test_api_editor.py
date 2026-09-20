@@ -188,3 +188,17 @@ def test_project_list_shows_the_real_title(tmp_path):
     (d / "source" / "source.json").write_text(json.dumps({"title": "My Interview"}))
     rows = TestClient(app).get("/api/projects", headers={"x-clipforge-token": "t"}).json()
     assert rows[0]["title"] == "My Interview"
+
+
+def test_recurate_accepts_a_json_body(tmp_path):
+    """Regression: a body model defined inside create_app made FastAPI treat `req` as a query parameter (422)."""
+    from fastapi.testclient import TestClient
+
+    from clipforge.api.app import create_app
+    from clipforge.config import Settings
+
+    app = create_app(Settings(DATA_DIR=tmp_path), token="t")  # pyright: ignore[reportCallIssue]
+    r = TestClient(app).post(
+        "/api/projects/nope/recurate", json={"mode": "fresh"}, headers={"x-clipforge-token": "t"}
+    )
+    assert r.status_code == 404  # reaches the handler (unknown project), not a 422 validation error
