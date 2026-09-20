@@ -36,6 +36,26 @@ def diarize_wav(wav: Path, settings: Settings, cancel: CancelToken) -> list[Turn
     if pipe is None:
         raise ASRError("The diarization model returned nothing.", "Check your HF token access.")
     runner: Any = pipe
-    result: Any = runner(str(wav))
+    result: Any = _run_on_best_device(runner, wav)
     ann: Any = getattr(result, "speaker_diarization", result)
     return [Turn(seg.start, seg.end, spk) for seg, _, spk in ann.itertracks(yield_label=True)]
+
+
+def _run_on_best_device(pipe: Any, wav: Path) -> Any:
+    """Prefer Apple's MPS GPU or CUDA; fall back to CPU if a device op is unsupported."""
+    import torch
+
+    device = (
+        "mps"
+        if torch.backends.mps.is_available()
+        else "cuda"
+        if torch.cuda.is_available()
+        else "cpu"
+    )
+    if device != "cpu":
+        try:
+            pipe.to(torch.device(device))
+            return pipe(str(wav))
+        except Exception:
+            pipe.to(torch.device("cpu"))
+    return pipe(str(wav))

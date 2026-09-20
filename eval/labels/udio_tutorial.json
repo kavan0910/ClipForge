@@ -1,0 +1,17 @@
+{
+  "video": "udio_tutorial",
+  "genre": "tutorial",
+  "labeller": "claude (hand-labelled from the transcript; subjective, review before trusting)",
+  "good": [
+    {"start": 0.0, "end": 29.8, "note": "Promise: full songs in Udio from 33-second snippets"},
+    {"start": 58.2, "end": 134.2, "note": "How to prompt a song and add style tags"},
+    {"start": 134.4, "end": 196.8, "note": "Three options: custom lyrics, instrumental, auto-generated"},
+    {"start": 397.2, "end": 458.8, "note": "How to add a section and extend the song"},
+    {"start": 631.5, "end": 661.2, "note": "Recap: a full song built step by step"}
+  ],
+  "bad": [
+    {"start": 30.3, "end": 58.0, "note": "Account sign-in logistics"},
+    {"start": 197.0, "end": 283.0, "note": "Listening to samples, little spoken content"},
+    {"start": 330.1, "end": 375.9, "note": "Transition and waiting"}
+  ]
+}

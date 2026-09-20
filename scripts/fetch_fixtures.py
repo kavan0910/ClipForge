@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+import time
 from pathlib import Path
 
 import httpx
@@ -38,6 +39,11 @@ def resolve(client: httpx.Client, title: str) -> tuple[str, str]:
         "format": "json",
     }
     r = client.get(API, params=params)
+    for attempt in range(6):
+        if r.status_code != 429:
+            break
+        time.sleep(float(r.headers.get("retry-after", 2 * (attempt + 1))))
+        r = client.get(API, params=params)
     r.raise_for_status()
     page = next(iter(r.json()["query"]["pages"].values()))
     info = page["imageinfo"][0]
@@ -53,11 +59,18 @@ def fetch(client: httpx.Client, entry: dict) -> str:
         return "cached"
     dest.parent.mkdir(parents=True, exist_ok=True)
     part = dest.with_suffix(dest.suffix + ".partial")
-    with client.stream("GET", url) as r:
-        r.raise_for_status()
-        with part.open("wb") as f:
-            for chunk in r.iter_bytes(1 << 20):
-                f.write(chunk)
+    for attempt in range(8):
+        with client.stream("GET", url) as r:
+            if r.status_code == 429:
+                time.sleep(float(r.headers.get("retry-after", 5 * (attempt + 1))))
+                continue
+            r.raise_for_status()
+            with part.open("wb") as f:
+                for chunk in r.iter_bytes(1 << 20):
+                    f.write(chunk)
+            break
+    else:
+        raise SystemExit(f"rate limited too long fetching {entry['file']}")
     part.rename(dest)
     digest = sha256(dest)
     if entry.get("sha256") and entry["sha256"] != digest:

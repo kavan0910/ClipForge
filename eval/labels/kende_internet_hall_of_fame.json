@@ -1,0 +1,15 @@
+{
+  "video": "kende_internet_hall_of_fame",
+  "genre": "interview",
+  "labeller": "claude (hand-labelled from the transcript; subjective, review before trusting)",
+  "good": [
+    {"start": 20.3, "end": 62.0, "note": "How mergers of internet backbones led to the interconnection question (regulated phone vs unregulated internet)"},
+    {"start": 78.7, "end": 122.6, "note": "The Digital Handshake paper and why not to regulate interconnection"},
+    {"start": 158.3, "end": 187.0, "note": "3 billion users, still 40% of the world; the internet is for everyone"},
+    {"start": 195.8, "end": 233.6, "note": "Privacy and security must be addressed as our lives move online"}
+  ],
+  "bad": [
+    {"start": 62.5, "end": 78.7, "note": "Career history and job title"},
+    {"start": 131.5, "end": 157.8, "note": "Short weather-metaphor answers without substance"}
+  ]
+}

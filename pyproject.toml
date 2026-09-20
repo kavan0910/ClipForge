@@ -17,6 +17,10 @@ dependencies = [
     "typer>=0.27.2",
     "uvicorn[standard]>=0.53.0",
     "yt-dlp>=2026.8.19",
+    "scenedetect>=0.7.1",
+    "opencv-python-headless>=5.0.0.93",
+    "panns-inference>=0.1.1",
+    "ai-edge-litert>=2.2.0",
 ]
 
 [project.scripts]
@@ -42,11 +46,10 @@ src = ["backend"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "S", "ASYNC", "RUF"]
-ignore = ["S101", "S603", "S607"]
+ignore = ["S101", "S603", "S607", "E501"]  # E501: the formatter owns line length
 
 [tool.ruff.lint.per-file-ignores]
 "backend/tests/**" = ["S"]
-"backend/clipforge/providers/url.py" = ["E501"]  # error-message table
 
 [tool.pyright]
 include = ["backend", "scripts"]

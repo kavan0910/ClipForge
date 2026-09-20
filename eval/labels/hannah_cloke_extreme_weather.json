@@ -1,0 +1,17 @@
+{
+  "video": "hannah_cloke_extreme_weather",
+  "genre": "interview",
+  "labeller": "claude (hand-labelled from the transcript; subjective, review before trusting)",
+  "good": [
+    {"start": 123.1, "end": 170.4, "note": "Floods have always happened; climate change makes them more likely (clear, quotable thesis)"},
+    {"start": 193.9, "end": 246.9, "note": "We can forecast weeks ahead but the public hears a day ahead; preparation behind the scenes"},
+    {"start": 452.5, "end": 482.0, "note": "Scientists wary of poetry; arts open new ways of thinking and communicating risk"},
+    {"start": 501.9, "end": 535.7, "note": "Grandmother's music box: what flood risk really means (emotional payoff)"},
+    {"start": 569.2, "end": 611.2, "note": "Heat is a silent killer, linked to health"}
+  ],
+  "bad": [
+    {"start": 0.9, "end": 34.0, "note": "Host introduction and greeting"},
+    {"start": 405.0, "end": 417.4, "note": "Small talk: it's a big job"},
+    {"start": 611.5, "end": 625.5, "note": "Sign-off"}
+  ]
+}

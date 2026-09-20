@@ -41,6 +41,12 @@ class SourceSpec(BaseModel):
 
 
 class Options(BaseModel):
+    clips: int | None = None
+    steering: str = ""
+    preset: Literal["economy", "balanced", "max"] = "balanced"
+    min_duration: float = 20.0
+    max_duration: float = 90.0
+    curate: bool = True
     language: str | None = None
     diarize: bool = True
     audio_track: int | None = None
@@ -233,6 +239,33 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
         await run_in_threadpool(jobs.cancel, p)
         await run_in_threadpool(p.delete)
         return {"ok": True}
+
+    class Recurate(BaseModel):
+        mode: Literal["fresh", "more_like", "shorter", "different_topic"] = "fresh"
+        reference_clip_id: str | None = None
+        steering: str = ""
+        clips: int | None = None
+        preset: str = "balanced"
+
+    @app.get("/api/projects/{project_id}/clips")
+    async def list_clips(project_id: str) -> dict[str, Any]:
+        from clipforge.curate.run import load_clips
+
+        p = open_project(project_id)
+        clips = await run_in_threadpool(load_clips, p)
+        return {"clips": [c.model_dump() for c in clips], "label": "Clip score (heuristic)"}
+
+    @app.post("/api/projects/{project_id}/recurate")
+    async def recurate(project_id: str, req: Recurate) -> dict[str, Any]:
+        p = open_project(project_id)
+        if not settings.anthropic_api_key:
+            raise ClipforgeError(
+                "No Anthropic API key is configured.", "Add ANTHROPIC_API_KEY to .env."
+            )
+        spec = json.loads(p.path("job.json").read_text())
+        spec["recurate"] = req.model_dump()
+        pid = await run_in_threadpool(jobs.start, p, spec)
+        return {"pid": pid}
 
     @app.get("/api/projects/{project_id}/events")
     async def events(project_id: str, request: Request) -> EventSourceResponse:

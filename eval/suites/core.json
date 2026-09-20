@@ -1,0 +1,11 @@
+{
+  "note": "Hand-labelled CC fixtures. Labels were written by the assistant from transcripts; treat as a first-pass baseline, not published-Shorts ground truth.",
+  "clips": 4,
+  "videos": [
+    "kende_internet_hall_of_fame",
+    "hannah_cloke_extreme_weather",
+    "udio_tutorial",
+    "fbi_podcast_fugitive",
+    "direct_current_rooftop_solar"
+  ]
+}

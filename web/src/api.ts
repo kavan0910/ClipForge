@@ -68,6 +68,33 @@ export interface ProjectData {
   error?: { code: string; message: string; action: string }
 }
 
+export interface ClipRow {
+  id: string
+  start: number
+  end: number
+  duration: number
+  title: string
+  hook: string
+  summary: string
+  why_it_works: string
+  scores: Record<string, number>
+  overall: number
+  rank_score: number
+  hashtags: string[]
+  risk_flags: string[]
+  hook_check: { passed: boolean; missing: string[] }
+  status: 'proposed' | 'approved' | 'rejected'
+  transcript: string
+}
+
+export interface CostState {
+  usd: number
+  cap_usd: number
+  input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+}
+
 export type SourceSpec =
   | { type: 'url'; url: string }
   | { type: 'upload'; upload_id: string }
@@ -81,6 +108,9 @@ export const api = {
   cancel: (id: string) => request<{ cancelled: boolean }>(`/api/projects/${id}/cancel`, { method: 'POST' }),
   resume: (id: string) => request<{ pid: number }>(`/api/projects/${id}/resume`, { method: 'POST' }),
   remove: (id: string) => request<{ ok: boolean }>(`/api/projects/${id}`, { method: 'DELETE' }),
+  clips: (id: string) => request<{ clips: ClipRow[]; label: string }>(`/api/projects/${id}/clips`),
+  recurate: (id: string, body: { mode: string; reference_clip_id?: string; steering?: string }) =>
+    request<{ pid: number }>(`/api/projects/${id}/recurate`, { method: 'POST', body: JSON.stringify(body) }),
   updateYtdlp: () => request<{ ok: boolean; note: string }>('/api/ytdlp/update', { method: 'POST' }),
 }
 
@@ -153,12 +183,19 @@ export interface ProgressEvent {
   warnings?: string[]
   chunk?: number
   chunks?: number
+  usd?: number
+  cap_usd?: number
+  input_tokens?: number
+  output_tokens?: number
+  cache_read_tokens?: number
+  note?: string
+  count?: number
 }
 
 export function subscribe(id: string, onEvent: (e: ProgressEvent) => void, onEnd: () => void): () => void {
   const es = new EventSource(`/api/projects/${id}/events`)
   const handler = (m: MessageEvent) => onEvent(JSON.parse(m.data))
-  for (const t of ['job_started', 'progress', 'stage_done', 'probe', 'source_ready', 'warning', 'job_done', 'job_error', 'job_cancelled']) {
+  for (const t of ['job_started', 'progress', 'stage_done', 'probe', 'source_ready', 'warning', 'cost', 'clips_ready', 'job_done', 'job_error', 'job_cancelled']) {
     es.addEventListener(t, handler as EventListener)
   }
   for (const t of ['job_done', 'job_error', 'job_cancelled']) {

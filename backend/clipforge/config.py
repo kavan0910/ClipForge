@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     anthropic_api_key: SecretStr | None = Field(default=None, alias="ANTHROPIC_API_KEY")
     scan_model: str = Field(default="claude-haiku-4-5-20251001", alias="CLIPFORGE_SCAN_MODEL")
     curate_model: str = Field(default="claude-sonnet-5", alias="CLIPFORGE_CURATE_MODEL")
+    max_scan_model: str = Field(default="claude-sonnet-5", alias="CLIPFORGE_MAX_SCAN_MODEL")
+    max_curate_model: str = Field(default="claude-opus-5", alias="CLIPFORGE_MAX_CURATE_MODEL")
     max_job_cost_usd: float = Field(default=1.00, alias="MAX_JOB_COST_USD", gt=0)
     hf_token: SecretStr | None = Field(default=None, alias="HF_TOKEN")
     asr_backend: Literal["auto", "faster-whisper", "mlx-whisper"] = Field(

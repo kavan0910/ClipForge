@@ -13,12 +13,14 @@ import traceback
 from pathlib import Path
 
 from clipforge.config import get_settings
+from clipforge.curate.run import CurateParams
 from clipforge.errors import ClipforgeError
 from clipforge.pipeline import IngestOptions, Reporter, ingest, transcribe
 from clipforge.procs import Cancelled, CancelToken, cancel_on_signals
 from clipforge.providers.base import SourceProvider
 from clipforge.providers.path import PathSource
 from clipforge.providers.url import UrlSource
+from clipforge.stages import curate_project
 from clipforge.store import Project
 from clipforge.uploads import UploadSource, UploadStore
 
@@ -48,6 +50,19 @@ def run_job(project: Project) -> int:
     project.emit("job_started")
     try:
         opts = job.get("options", {})
+        if "recurate" in job:  # re-curation only: no ingest, transcription or signals
+            r = job.pop("recurate")
+            project.path("job.json").write_text(json.dumps(job))
+            params = CurateParams(
+                n_clips=r.get("clips"), steering=r.get("steering", ""), preset=r.get("preset", "balanced"),
+                mode=r["mode"], reference_clip_id=r.get("reference_clip_id"),
+                min_duration=opts.get("min_duration", 20.0), max_duration=opts.get("max_duration", 90.0),
+            )  # fmt: skip
+            if r["mode"] == "shorter":
+                params.max_duration = min(params.max_duration, 45.0)
+            out = curate_project(project, settings, reporter, cancel, params)
+            project.emit("job_done", clips=len(out.clips))
+            return 0
         provider = build_provider(job["source"], settings)
         src = ingest(
             project, provider, settings, reporter, cancel, IngestOptions(opts.get("audio_track"))
@@ -57,7 +72,20 @@ def run_job(project: Project) -> int:
             project, src, settings, reporter, cancel, opts.get("language"),
             opts.get("brand_vocabulary"), opts.get("diarize", True),
         )  # fmt: skip
-        project.emit("job_done", words=len(t.words), sentences=len(t.sentences))
+        clips = None
+        if opts.get("curate", True) and t.words:
+            if settings.anthropic_api_key:
+                params = CurateParams(
+                    n_clips=opts.get("clips"), steering=opts.get("steering", ""),
+                    preset=opts.get("preset", "balanced"), language=opts.get("language"),
+                    min_duration=opts.get("min_duration", 20.0), max_duration=opts.get("max_duration", 90.0),
+                )  # fmt: skip
+                clips = curate_project(project, settings, reporter, cancel, params).clips
+            else:
+                project.emit("warning", message="No Anthropic API key: clip selection was skipped.",
+                             action="Add ANTHROPIC_API_KEY to .env and use Re-curate.")  # fmt: skip
+        project.emit("job_done", words=len(t.words), sentences=len(t.sentences),
+                     clips=len(clips) if clips is not None else None)  # fmt: skip
         return 0
     except Cancelled:
         project.emit("job_cancelled")

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api, subscribe, type ProgressEvent, type ProjectData } from '../api'
+import { api, subscribe, type ClipRow, type CostState, type ProgressEvent, type ProjectData } from '../api'
+import { ClipCard } from './ClipCard'
+import { CostMeter } from './CostMeter'
 import { fmtBytes, fmtDuration, fmtEta } from '../format'
 
 const STEPS = [
@@ -7,6 +9,8 @@ const STEPS = [
   { key: 'audio', label: 'Prepare audio' },
   { key: 'proxy', label: 'Build preview proxy' },
   { key: 'transcribe', label: 'Transcribe with word timing' },
+  { key: 'signals', label: 'Measure audio, motion and audience signals' },
+  { key: 'curate', label: 'Find, score and refine clips' },
 ] as const
 
 interface StepState {
@@ -17,7 +21,13 @@ interface StepState {
   done: boolean
 }
 
-const STAGE_ALIAS: Record<string, string> = { normalize_audio: 'audio', normalize_proxy: 'proxy', diarize: 'transcribe' }
+const STAGE_ALIAS: Record<string, string> = {
+  normalize_audio: 'audio',
+  normalize_proxy: 'proxy',
+  diarize: 'transcribe',
+  signals_events: 'signals',
+  signals_visual: 'signals',
+}
 
 export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) {
   const [project, setProject] = useState<ProjectData | null>(null)
@@ -25,9 +35,19 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
   const [logs, setLogs] = useState<string[]>([])
   const [showLogs, setShowLogs] = useState(false)
   const [warnings, setWarnings] = useState<string[]>([])
+  const [cost, setCost] = useState<CostState | null>(null)
+  const [clips, setClips] = useState<ClipRow[]>([])
+  const [steer, setSteer] = useState('')
   const unsub = useRef<() => void>(() => undefined)
 
-  const refresh = useCallback(() => api.project(id).then(setProject), [id])
+  const refresh = useCallback(
+    () =>
+      Promise.all([api.project(id), api.clips(id)]).then(([p, c]) => {
+        setProject(p)
+        setClips(c.clips)
+      }),
+    [id],
+  )
 
   const listen = useCallback(() => {
     unsub.current()
@@ -36,12 +56,16 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
       (e: ProgressEvent) => {
         setLogs((l) => [...l.slice(-199), `${e.type} ${e.stage ?? ''} ${e.message ?? ''}`.trim()])
         if (e.type === 'source_ready' && e.warnings) setWarnings((w) => [...w, ...e.warnings!])
+        if (e.type === 'cost' && e.usd !== undefined) {
+          setCost({ usd: e.usd, cap_usd: e.cap_usd ?? 1, input_tokens: e.input_tokens ?? 0, output_tokens: e.output_tokens ?? 0, cache_read_tokens: e.cache_read_tokens ?? 0 })
+        }
+        if (e.type === 'clips_ready') setSteps((s) => ({ ...s, curate: { pct: 1, detail: '', done: true } }))
         if (e.type === 'warning' && e.message) setWarnings((w) => [...w, e.action ? `${e.message} ${e.action}` : e.message!])
         const key = STAGE_ALIAS[e.stage ?? ''] ?? e.stage
         if (!key) return
         if (e.type === 'progress') {
           const detail =
-            e.bytes != null && e.total
+            e.note ? e.note : e.bytes != null && e.total
               ? `${fmtBytes(e.bytes)} of ${fmtBytes(e.total)}${e.speed ? ` · ${fmtBytes(e.speed)}/s` : ''} ${fmtEta(e.eta)}`
               : e.chunks && e.chunks > 1
                 ? `chunk ${e.chunk} of ${e.chunks}`
@@ -139,6 +163,23 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
           <p className="muted" style={{ margin: 0 }} data-testid="quality">
             {[project.source.quality.resolution, project.source.quality.fps ? `${project.source.quality.fps} fps` : null, project.source.quality.audio_summary, fmtDuration(project.source.probe.duration)].filter(Boolean).join(' · ')}
           </p>
+        </section>
+      )}
+
+      {(cost || clips.length > 0) && <CostMeter cost={cost} />}
+
+      {clips.length > 0 && (
+        <section aria-label="Clips" className="grid gap-3">
+          <h3 style={{ fontSize: 16 }} data-testid="clips-ready">{clips.length} clips proposed</h3>
+          {clips.map((c) => (
+            <ClipCard key={c.id} clip={c} onMoreLike={(cid) => api.recurate(id, { mode: 'more_like', reference_clip_id: cid }).then(() => { void refresh(); listen() })} />
+          ))}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn" onClick={() => api.recurate(id, { mode: 'shorter' }).then(() => { void refresh(); listen() })}>Shorter</button>
+            <button className="btn" onClick={() => api.recurate(id, { mode: 'different_topic' }).then(() => { void refresh(); listen() })}>Different topic</button>
+            <input className="field" style={{ flex: 1, minWidth: 200 }} placeholder="Steer: e.g. find the funniest moments" aria-label="Steering text" value={steer} onChange={(e) => setSteer(e.target.value)} />
+            <button className="btn" disabled={!steer.trim()} onClick={() => api.recurate(id, { mode: 'fresh', steering: steer }).then(() => { void refresh(); listen() })}>Re-curate</button>
+          </div>
         </section>
       )}
 

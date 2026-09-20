@@ -14,6 +14,55 @@
       "licence": "CC BY 3.0",
       "genre": "interview",
       "sha256": "154fdef10f3ede0d42f2431c2a4a1769e0280b2eb18b265ba699ce050e8028eb"
+    },
+    {
+      "file": "applause.ogg",
+      "commons_title": "File:Slow starting applause.ogg",
+      "licence": "Public domain",
+      "genre": "events",
+      "sha256": "6851e0c0e7f4953bcfcbd9f4c9b425ecfd2896e142332bc1607c214aef6cec68"
+    },
+    {
+      "file": "laughter_crowd.wav",
+      "commons_title": "File:72844 lonemonk approx-800-laughter-and-clapter-1.wav",
+      "licence": "CC BY 3.0",
+      "genre": "events",
+      "sha256": "8b928e6307f7db0ce5542ae827075f24ada80f007f3a4fdb415559ec9c4e4055"
+    },
+    {
+      "file": "dave_brown_comedian.ogg",
+      "commons_title": "File:Dave Brown (comedian).ogg",
+      "licence": "CC BY-SA 3.0",
+      "genre": "comedy",
+      "sha256": "1543d088425733e3c28cc5a1e923fcfa82ad7dfd6b6dae91ec122346ede2a906"
+    },
+    {
+      "file": "udio_tutorial.webm",
+      "commons_title": "File:Udio Tutorial - How To Make A Full Song - Detailed Guide.webm",
+      "licence": "CC BY 3.0",
+      "genre": "tutorial",
+      "sha256": "67eb3c500b2bdb52730ae95fd31b9e65ad6d09e84b3da0110d7a387db2f90516"
+    },
+    {
+      "file": "fbi_podcast_fugitive.webm",
+      "commons_title": "File:Inside the FBI Podcast – Top Ten Fugitive Yulan Adonay Archaga Carias.webm",
+      "licence": "Public domain",
+      "genre": "podcast",
+      "sha256": "474a825202760513a4b2d0f1b3b99cd197743b8578ca36caf462e848d6f8ba41"
+    },
+    {
+      "file": "direct_current_rooftop_solar.webm",
+      "commons_title": "File:Episode 1 - Tackling the Hidden Costs of Rooftop Solar (Direct Current - An Energy dot Gov Podcast).webm",
+      "licence": "Public domain",
+      "genre": "podcast",
+      "sha256": "86922777f09a53a98e9d06d1e85a374b4a2701f9e3fb83e20a5a6b12063f53b3"
+    },
+    {
+      "file": "flynn_right_to_research.webm",
+      "commons_title": "File:Prof Sean Flynn A Conceptual Overview. Right to Research in International Copyright Seminar 1.webm",
+      "licence": "CC BY 4.0",
+      "genre": "lecture",
+      "sha256": "9d43d94725080e82683f8452032ebf7de3fffde1c3e1591b8a532b0a22d86043"
     }
   ]
 }
