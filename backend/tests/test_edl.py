@@ -40,7 +40,11 @@ def test_roundtrip_and_monotonic_mapping(keep, data):
     t = data.draw(st.floats(a, b))
     out = edl.src_to_out(t)
     assert out is not None and 0 <= out <= edl.duration + 1e-9
-    assert edl.out_to_src(out) == pytest.approx(t, abs=1e-6)
+    back = edl.out_to_src(out)
+    if abs(t - b) < 1e-6:  # the end of one kept range and the start of the next share one output instant
+        assert edl.src_to_out(back) == pytest.approx(out, abs=1e-6)
+    else:
+        assert back == pytest.approx(t, abs=1e-6)
     o1, o2 = sorted(data.draw(st.floats(0, max(edl.duration, 0.1))) for _ in range(2))
     assert edl.out_to_src(o1) <= edl.out_to_src(o2) + 1e-9
 

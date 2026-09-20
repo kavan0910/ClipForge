@@ -131,6 +131,10 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
             raise ClipforgeError("Updating yt-dlp failed.", (p.stderr or p.stdout)[-300:])
         return {"ok": True, "note": "Restart Clipforge to load the new version."}
 
+    from clipforge.api import editor as editor_routes
+
+    editor_routes.register(app, open_project, projects_dir, settings)
+
     # -- link source ------------------------------------------------------
     @app.post("/api/sources/resolve")
     async def resolve(req: ResolveRequest) -> dict[str, Any]:

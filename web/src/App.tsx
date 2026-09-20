@@ -3,6 +3,10 @@ import { LinkTab } from './components/LinkTab'
 import { CaptionPreview } from './components/CaptionPreview'
 import { ProjectView } from './components/ProjectView'
 import { UploadTab } from './components/UploadTab'
+import { ClipEditor } from './components/ClipEditor'
+import { ProjectsList } from './components/ProjectsList'
+import { RenderQueue } from './components/RenderQueue'
+import { SettingsPage } from './components/SettingsPage'
 
 type Tab = 'link' | 'upload'
 
@@ -19,7 +23,9 @@ function useHashRoute(): [string, (h: string) => void] {
 export default function App() {
   const [hash, go] = useHashRoute()
   const [tab, setTab] = useState<Tab>('link')
-  const projectId = hash.startsWith('#/p/') ? hash.slice(4) : null
+  const parts = hash.startsWith('#/p/') ? hash.slice(4).split('/') : []
+  const projectId = parts[0] || null
+  const clipId = parts[1] === 'c' ? parts[2] : null
   const preview = hash.startsWith('#/preview/') ? hash.slice(10).split('/') : null
 
   function onKey(e: React.KeyboardEvent) {
@@ -30,12 +36,21 @@ export default function App() {
     <main className="shell">
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 28 }}>
         <span className="brand">Clipforge</span>
+        <nav aria-label="Main" style={{ display: 'flex', gap: 14 }}>
+          <a href="#/">New</a><a href="#/queue">Queue</a><a href="#/settings">Settings</a>
+        </nav>
         <span className="notice" style={{ maxWidth: 420, textAlign: 'right' }}>
           Your video stays on this computer. Only transcript text is sent to the Anthropic API for clip selection.
         </span>
       </header>
       {preview ? (
         <CaptionPreview projectId={preview[0]} clipId={preview[1]} />
+      ) : hash === '#/queue' ? (
+        <RenderQueue />
+      ) : hash === '#/settings' ? (
+        <SettingsPage />
+      ) : projectId && clipId ? (
+        <ClipEditor projectId={projectId} clipId={clipId} onBack={() => go(`#/p/${projectId}`)} />
       ) : projectId ? (
         <ProjectView id={projectId} onBack={() => go('#/')} />
       ) : (
@@ -50,6 +65,7 @@ export default function App() {
             </button>
           </div>
           {tab === 'link' ? <LinkTab onStart={(id) => go(`#/p/${id}`)} /> : <UploadTab onStart={(id) => go(`#/p/${id}`)} />}
+          <ProjectsList onOpen={(id) => go(`#/p/${id}`)} />
         </div>
       )}
     </main>

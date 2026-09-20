@@ -190,7 +190,7 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
         <section aria-label="Clips" className="grid gap-3">
           <h3 style={{ fontSize: 16 }} data-testid="clips-ready">{clips.length} clips proposed</h3>
           {clips.map((c) => (
-            <ClipCard key={c.id} clip={c} onMoreLike={(cid) => api.recurate(id, { mode: 'more_like', reference_clip_id: cid }).then(() => { void refresh(); listen() })} />
+            <ClipCard key={c.id} clip={c} onOpen={(cid) => { window.location.hash = `#/p/${id}/c/${cid}` }} onDecide={(cid, status) => void api.editor(id, cid).then((d) => api.saveEdits(id, cid, { ...d.edits, status })).then(refresh)} onMoreLike={(cid) => api.recurate(id, { mode: 'more_like', reference_clip_id: cid }).then(() => { void refresh(); listen() })} />
           ))}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button className="btn" onClick={() => api.recurate(id, { mode: 'shorter' }).then(() => { void refresh(); listen() })}>Shorter</button>

@@ -95,3 +95,92 @@ def status(project: Project) -> str:
             last["type"]
         ]
     return "running" if running_pid(project) is not None else "cancelled"
+
+
+# -- clip render jobs (one process per clip; independent of the ingest/curate job) ------------------
+def render_pid_file(project: Project, clip_id: str):
+    return project.path("clips", clip_id, "render.pid")
+
+
+def render_running_pid(project: Project, clip_id: str) -> int | None:
+    f = render_pid_file(project, clip_id)
+    if not f.exists():
+        return None
+    try:
+        pid = int(f.read_text())
+    except ValueError:
+        return None
+    return pid if _alive(pid) else None
+
+
+def start_render(project: Project, clip_id: str, options: dict[str, Any]) -> int:
+    if (pid := render_running_pid(project, clip_id)) is not None:
+        return pid
+    d = project.path("clips", clip_id)
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "render.json").write_text(json.dumps(options))
+    log = (d / "render.log").open("ab")
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "clipforge.renderjob", str(project.root), clip_id],
+        stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True,
+    )  # fmt: skip
+    render_pid_file(project, clip_id).write_text(str(proc.pid))
+    threading.Thread(target=proc.wait, daemon=True).start()
+    return proc.pid
+
+
+def cancel_render(project: Project, clip_id: str, grace: float = 6.0) -> bool:
+    pid = render_running_pid(project, clip_id)
+    if pid is None:
+        return False
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return False
+    import time
+
+    end = time.time() + grace
+    while time.time() < end and _alive(pid):
+        time.sleep(0.1)
+    if _alive(pid):
+        try:
+            os.killpg(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    return True
+
+
+def render_status(project: Project, clip_id: str) -> dict[str, Any]:
+    """{state: idle|running|done|error|cancelled, pct, error?} from the event log."""
+    events, _ = project.read_events(0)
+    mine = [e for e in events if e.get("clip") == clip_id and e["type"].startswith("render_")]
+    if not mine:
+        return {"state": "idle", "pct": 0.0}
+    last_state = next(
+        (
+            e
+            for e in reversed(mine)
+            if e["type"] in {"render_started", "render_done", "render_error", "render_cancelled"}
+        ),
+        None,
+    )
+    prog = next((e for e in reversed(mine) if e["type"] == "render_progress"), None)
+    pct = float(prog["pct"]) if prog and prog.get("pct") is not None else 0.0
+    if last_state is None:
+        return {"state": "idle", "pct": 0.0}
+    t = last_state["type"]
+    if t == "render_done":
+        return {"state": "done", "pct": 1.0}
+    if t == "render_error":
+        return {
+            "state": "error",
+            "pct": pct,
+            "error": {k: last_state.get(k) for k in ("code", "message", "action")},
+        }
+    if t == "render_cancelled":
+        return {"state": "cancelled", "pct": pct}
+    return {
+        "state": "running" if render_running_pid(project, clip_id) is not None else "cancelled",
+        "pct": pct,
+        "note": prog.get("note") if prog else None,
+    }

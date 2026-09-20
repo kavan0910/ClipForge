@@ -5,17 +5,18 @@ from __future__ import annotations
 import json
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
 
 from clipforge import brand as brandmod
+from clipforge import edits as clipedits
 from clipforge import media
 from clipforge.brand import BrandKit
 from clipforge.captions import stage as capstage
 from clipforge.captions.stage import CaptionOptions
-from clipforge.cleanup import Level, plan_cleanup
+from clipforge.cleanup import Level
 from clipforge.curate.schema import Clip
 from clipforge.edl import EDL
 from clipforge.errors import ClipforgeError, MediaError
@@ -99,23 +100,33 @@ def render_clip(
     # 1. EDL: the clip's own cut plus filler/pause cleanup
     report("render", 0.02, note="planning cuts")
     rms = rms_db_frames(wav)
-    edl = plan_cleanup(
-        clip.id, transcript.words, clip.start, clip.end, level, rms, source.probe.duration
-    )
+    # The editor's saved decisions (trims, text cuts, restores, layouts, template) win over defaults.
+    edits = clipedits.load_edits(project, clip.id)
+    if not clipedits.edits_path(project, clip.id).exists():
+        edits = edits.model_copy(update={"cleanup": level})
+    clip = clipedits.effective_clip(clip, edits)
+    edl = clipedits.build_edl(clip, transcript.words, edits, rms, source.probe.duration)
+    clip_start, clip_end = edl.segments[0].src_in, edl.segments[-1].src_out
+    if edits.template and captions is not None:
+        captions = replace(captions, template=edits.template)
+    if edits.brand and brand is None:
+        brand = brandmod.load_kit(edits.brand, brand_root)
+    if captions is not None and not edits.hook_enabled:
+        captions = replace(captions, hook=False)
     (d / "edl.json").write_text(edl.model_dump_json(indent=1))
 
     # 2. Face analysis on the proxy over the clip range
     report("render", 0.05, note="analysing faces")
-    t0, t1 = max(clip.start - 1.0, 0.0), min(clip.end + 1.0, source.probe.duration)
+    t0, t1 = max(clip_start - 1.0, 0.0), min(clip_end + 1.0, source.probe.duration)
     analysis = run_analysis(Path(source.proxy_path), d / "analysis.json", t0, t1, cancel)
 
     # 3. Layout plan and camera solve
     report("render", 0.15, note="planning camera")
     scene = rplan.scene_from_analysis(analysis)
-    turns = rplan.turns_from_words(transcript.words, clip.start, clip.end)
+    turns = rplan.turns_from_words(transcript.words, clip_start, clip_end)
     cw, _ = crop_size(scene.width, scene.height, OUT_W / OUT_H, 1.0)
-    shots = rplan.shots_from_cuts(clip.start, clip.end, scene_cuts or [])
-    plan = rplan.build_plan(scene, shots, turns, cw)
+    shots = rplan.shots_from_cuts(clip_start, clip_end, scene_cuts or [])
+    plan = rplan.build_plan(scene, shots, turns, cw, overrides=clipedits.layout_overrides(edits))
     solved = solve(scene, plan, edl, fps, punch_in=punch_in)
     (d / "reframe.json").write_text(json.dumps({
         "plan": [{"t0": s.t0, "t1": s.t1, "layout": s.layout, "focus": s.focus, "cam_track": s.cam_track,
@@ -167,7 +178,8 @@ def render_clip(
     rvideo.render_video(master, video, edl, solved, final_audio, out, fast, tonemap_ok,
                         lambda p: report("render", 0.25 + 0.7 * p), cancel, overlay=overlay,
                         ass_path=cap_res.ass_path if cap_res else None, fonts_dir=capstage.FONTS_DIR,
-                        layers=cap_res.layers if cap_res else None, head=head, tail=tail)  # fmt: skip
+                        layers=cap_res.layers if cap_res else None, head=head, tail=tail,
+                        preview=d / "base_preview.mp4")  # fmt: skip
     thumb_info = None
     if cap_res is not None or True:
         from clipforge.render import metadata as rmeta

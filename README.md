@@ -4,7 +4,7 @@ Local-first AI clipping studio: one long video in, ready-to-post vertical shorts
 Your video never leaves this machine. Only transcript text and light metadata go to the
 Anthropic API for the editorial step (Phase 2), and the UI says so.
 
-**Status: Phase 4 of 6 done (captions, brand kits, thumbnails, packaging). Phase 5 (review UI) next.** See `docs/PLAN.md` and `docs/checkpoints/`.
+**Status: Phase 5 of 6 done (review UI, render queue, export, settings). Phase 6 (publishing, audiogram, final report) next.** See `docs/PLAN.md` and `docs/checkpoints/`.
 
 ## Setup
 
@@ -33,6 +33,11 @@ CLI: `clipforge run <url|path> --clips 8 --duration 30-60 --preset balanced --st
   stacked, screen+cam, blurred fit), filler/pause cleanup, click-free audio at -14 LUFS, one H.264 encode, debug render.
 - Designer captions: 8 templates, word-by-word highlight, hook overlay, brand kits (logo, intro/outro cards), rendered by Remotion
   (default) or libass (fast fallback), composited inside the single encode; SRT/VTT/ASS sidecars, thumbnail and `metadata.json`.
+- Review UI (`#/p/<id>/c/<clip>`): video preview with the exact caption composition overlaid, transcript with click-to-seek, text-based
+  cutting (select words, X), draggable trim, filler restore, per-segment layout override, live template switch, hook/title/hashtag editing,
+  autosave. Keyboard: Space play, J/K/L, `[` `]` in/out, A/R approve/reject, X/U cut/restore, arrows step by word.
+- Render queue with cancel and download; export as MP4 folder/zip, OpenTimelineIO, FCPXML, FCP7 XML or CMX 3600 EDL (cuts as edits on the source).
+- Settings: keys (masked, written to `.env` mode 600), preferences, health check, storage cleanup, brand kits.
 - Live progress over SSE, cancel (kills the whole process tree) and resume.
 
 ## Hardware notes
@@ -64,5 +69,6 @@ and will be measured against the API `usage` fields in Phase 2.
 - The LLM path is verified offline only until the API key has credit (see `docs/checkpoints/phase-2.md`).
 - Active speaker is only verified on synthetic multi-person scenes; see `docs/checkpoints/phase-3.md`.
 - No SQLite index yet: the filesystem manifests are the source of truth; the index arrives with clips in Phase 2.
-- Settings screen (cookies-from-browser, brand kits) arrives in Phase 5; today use `.env`.
+- FCPXML cannot express NTSC frame rates in the bundled adapter: exports fall back to an integer rate and say so.
+- The video preview is a caption-free proxy from the last render; after edits the captions update live, the picture after a re-render.
 - Live-chat replay download is not implemented yet (the flag is harvested; rate extraction is Phase 2).

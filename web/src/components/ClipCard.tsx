@@ -13,9 +13,13 @@ const DIMENSIONS: [string, string][] = [
 export function ClipCard({
   clip,
   onMoreLike,
+  onOpen,
+  onDecide,
 }: {
   clip: ClipRow
   onMoreLike: (id: string) => void
+  onOpen: (id: string) => void
+  onDecide: (id: string, status: 'approved' | 'rejected') => void
 }) {
   const score = Math.round(clip.rank_score * 100)
   return (
@@ -62,6 +66,9 @@ export function ClipCard({
         ))}
         <span className="muted" style={{ flex: 1 }}>{clip.hashtags.map((h) => `#${h}`).join(' ')}</span>
         <button className="btn" onClick={() => onMoreLike(clip.id)}>More like this</button>
+        <button className="btn" aria-pressed={clip.status === 'approved'} onClick={() => onDecide(clip.id, 'approved')} data-testid="card-approve">Approve</button>
+        <button className="btn btn-danger" aria-pressed={clip.status === 'rejected'} onClick={() => onDecide(clip.id, 'rejected')}>Reject</button>
+        <button className="btn btn-primary" onClick={() => onOpen(clip.id)} data-testid="open-editor">Edit &amp; render</button>
       </footer>
     </article>
   )

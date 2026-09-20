@@ -308,6 +308,31 @@ def enforce_hysteresis(
     return merged
 
 
+def _complete_override(scene: Scene, o: LayoutSegment) -> None:
+    """Fill in what an editor's override needs (which face to follow) from the analysis."""
+    o.override = True
+    sig = sorted(significant_tracks(scene, 0.05), key=lambda t: -float(np.nansum(t.w * t.h)))
+    if o.layout == "single" and sig and not o.focus:
+        o.focus = [(o.t0, o.t1, sig[0].id)]
+    elif o.layout in ("two", "stacked") and len(sig) >= 2 and not o.tracks:
+        o.tracks = [sig[0].id, sig[1].id]
+        o.focus = [(o.t0, o.t1, sig[0].id)]
+    elif o.layout == "screen_cam" and o.cam_track is None:
+        o.cam_track = detect_facecam(scene) or (
+            min(sig, key=lambda t: float(np.nanmedian(t.w))).id if sig else None
+        )
+    if o.layout in ("single", "two", "stacked") and (
+        not o.focus or (o.layout != "single" and len(o.tracks) < 2 and o.layout != "two")
+    ):
+        if o.layout != "single" and len(o.tracks) < 2:
+            o.layout = (
+                "single" if sig else "fit_blur"
+            )  # not enough faces for a split: degrade gracefully
+            o.focus = [(o.t0, o.t1, sig[0].id)] if sig else []
+    if o.layout == "screen_cam" and o.cam_track is None:
+        o.layout = "fit_blur"
+
+
 def build_plan(
     scene: Scene, shots: list[tuple[float, float]], turns: list[Turn], crop_w: float,
     overrides: list[LayoutSegment] | None = None,
@@ -316,7 +341,7 @@ def build_plan(
     segs = [plan_shot(scene, a, b, turns, crop_w) for a, b in shots if b - a > 1e-6]
     segs = enforce_hysteresis(segs)
     for o in overrides or []:
-        o.override = True
+        _complete_override(scene, o)
         out: list[LayoutSegment] = []
         for s in segs:
             if s.t1 <= o.t0 or s.t0 >= o.t1:

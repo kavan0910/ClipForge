@@ -21,6 +21,10 @@ dependencies = [
     "opencv-python-headless>=5.0.0.93",
     "panns-inference>=0.1.1",
     "ai-edge-litert>=2.2.0",
+    "opentimelineio>=0.18.1",
+    "otio-fcpx-xml-adapter>=1.0.0",
+    "otio-cmx3600-adapter>=1.0.0",
+    "otio-fcp-adapter>=1.0.0",
 ]
 
 [project.scripts]

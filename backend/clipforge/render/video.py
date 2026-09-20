@@ -176,13 +176,34 @@ def encode_argv(
             "-color_range", "tv", "-c:a", "aac", "-b:a", "192k", "-t", f"{duration:.6f}", "-movflags", "+faststart", str(out)]  # fmt: skip
 
 
+PREVIEW_W, PREVIEW_H = 360, 640
+
+
+def _start_preview(path: Path, audio: Path, fps: float, frames: int) -> subprocess.Popen:
+    """Small caption-free proxy of the composed clip: the editor plays it under the live caption preview."""
+    argv = ["ffmpeg", "-nostdin", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{PREVIEW_W}x{PREVIEW_H}",
+            "-r", fps_arg(fps), "-i", "-", "-i", str(audio), "-c:v", "libx264", "-preset", "ultrafast", "-crf", "30", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "64k", "-t", f"{frames / fps:.6f}", "-movflags", "+faststart", str(path.with_suffix(".partial.mp4"))]  # fmt: skip
+    return subprocess.Popen(
+        argv, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True
+    )
+
+
+def _finish_preview(proc: subprocess.Popen, path: Path) -> None:
+    if proc.stdin:
+        proc.stdin.close()
+    proc.wait()
+    if proc.returncode == 0:
+        path.with_suffix(".partial.mp4").replace(path)
+
+
 def render_video(
     master: Path, video: VideoInfo, edl: EDL, solved: Solved, audio: Path, out: Path, fast: bool = False,
     tonemap_ok: bool = True, on_progress: Callable[[float], None] | None = None, cancel: CancelToken | None = None,
     overlay: Callable[[np.ndarray, int], np.ndarray] | None = None, codec_args: list[str] | None = None,
     ass_path: Path | None = None, fonts_dir: Path | None = None,
     layers: list[tuple[Path, int]] | None = None, head: list[np.ndarray] | None = None,
-    tail: list[np.ndarray] | None = None,
+    tail: list[np.ndarray] | None = None, preview: Path | None = None,
 ) -> None:  # fmt: skip
     """Decode each kept segment, compose every output frame, pipe into one encode."""
     fps = solved.fps
@@ -193,10 +214,22 @@ def render_video(
                                 ass_path=ass_path, fonts_dir=fonts_dir, layers=layers),
                             stdin=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)  # fmt: skip
     written = 0
+    prev = _start_preview(preview, audio, fps, total) if preview else None
+
+    def emit(img: np.ndarray) -> None:
+        assert proc.stdin is not None
+        proc.stdin.write(np.ascontiguousarray(img).tobytes())
+        if prev is not None and prev.stdin is not None:
+            import cv2
+
+            prev.stdin.write(
+                cv2.resize(img, (PREVIEW_W, PREVIEW_H), interpolation=cv2.INTER_AREA).tobytes()
+            )
+
     try:
         assert proc.stdin is not None
         for card in head:
-            proc.stdin.write(np.ascontiguousarray(card).tobytes())
+            emit(card)
             written += 1
         for seg in edl.segments:
             f0 = round(seg.out_in * fps)
@@ -209,14 +242,16 @@ def render_video(
                 img = compose(frame, solved.frames[f0 + i])
                 if overlay:
                     img = overlay(img, f0 + i)
-                proc.stdin.write(np.ascontiguousarray(img).tobytes())
+                emit(img)
                 written += 1
                 if on_progress and written % 15 == 0:
                     on_progress(written / total)
         for card in tail:
-            proc.stdin.write(np.ascontiguousarray(card).tobytes())
+            emit(card)
             written += 1
         proc.stdin.close()
+        if prev is not None and preview is not None:
+            _finish_preview(prev, preview)
         err = proc.stderr.read().decode(errors="replace") if proc.stderr else ""
         if proc.wait() != 0:
             raise MediaError("The video encode failed.", err[-300:])

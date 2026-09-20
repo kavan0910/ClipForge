@@ -96,6 +96,36 @@ export interface CostState {
   cache_read_tokens: number
 }
 
+export interface Removed { id: string; kind: string; src_in: number; src_out: number; text: string; restored: boolean }
+export interface ClipEdits {
+  title?: string | null; hook?: string | null; description?: string | null; hashtags?: string[] | null
+  start_word?: number | null; end_word?: number | null; exclude: [number, number][]; cleanup: 'off' | 'light' | 'aggressive'
+  restored: number[]; template?: string | null; brand?: string | null; hook_enabled: boolean
+  layouts: { t0: number; t1: number; layout: string }[]; status?: 'proposed' | 'approved' | 'rejected' | null
+}
+export interface RenderState { state: 'idle' | 'running' | 'done' | 'error' | 'cancelled'; pct: number; note?: string | null; error?: { message: string; action: string } }
+export interface EditorData {
+  clip: ClipRow & { description: string }
+  edits: ClipEdits
+  duration: number
+  segments: { src_in: number; src_out: number; out_in: number }[]
+  removed: Removed[]
+  words: { i: number; w: string; start: number; end: number; kept: boolean; speaker: string | null }[]
+  first_word: number
+  last_word: number
+  layouts: { t0: number; t1: number; layout: string }[]
+  files: Record<string, boolean>
+  render: RenderState
+  templates: string[]
+  brand_kits: string[]
+}
+export interface RenderRow { project: string; clip: string; title: string; duration: number; state: RenderState['state']; pct: number; note?: string | null; has_video: boolean; status: string; error?: { message: string; action: string } }
+export interface SettingsData { anthropic_api_key: string | null; hf_token: string | null; values: Record<string, string>; data_dir: string }
+export interface DoctorCheck { name: string; status: 'ok' | 'warn' | 'fail'; detail: string; fix: string }
+export interface StorageData { projects: { id: string; bytes: number; intermediate_bytes: number }[]; total_bytes: number; free_bytes: number }
+export interface BrandKitData { id: string; name: string; text_color: string | null; accent_color: string | null; default_template: string; vocabulary: string[]; logo: unknown; intro: { title: string } | null; outro: { title: string } | null }
+export interface ProjectRow { id: string; title: string; status: string }
+
 export type SourceSpec =
   | { type: 'url'; url: string }
   | { type: 'upload'; upload_id: string }
@@ -112,6 +142,22 @@ export const api = {
   clips: (id: string) => request<{ clips: ClipRow[]; label: string }>(`/api/projects/${id}/clips`),
   recurate: (id: string, body: { mode: string; reference_clip_id?: string; steering?: string }) =>
     request<{ pid: number }>(`/api/projects/${id}/recurate`, { method: 'POST', body: JSON.stringify(body) }),
+  projects: () => request<ProjectRow[]>('/api/projects'),
+  editor: (id: string, cid: string) => request<EditorData>(`/api/projects/${id}/clips/${cid}/editor`),
+  saveEdits: (id: string, cid: string, e: ClipEdits) => request<{ ok: boolean }>(`/api/projects/${id}/clips/${cid}/edits`, { method: 'PUT', body: JSON.stringify(e) }),
+  timeline: (id: string, cid: string, template?: string) => request<{ timeline: unknown; template: unknown }>(`/api/projects/${id}/clips/${cid}/timeline${template ? `?template=${template}` : ''}`),
+  render: (id: string, cid: string, body: Record<string, unknown> = {}) => request<{ pid: number }>(`/api/projects/${id}/clips/${cid}/render`, { method: 'POST', body: JSON.stringify(body) }),
+  cancelRender: (id: string, cid: string) => request<{ cancelled: boolean }>(`/api/projects/${id}/clips/${cid}/render/cancel`, { method: 'POST' }),
+  renders: () => request<RenderRow[]>('/api/renders'),
+  exportClips: (clips: [string, string][], format: string) => request<{ path: string; name: string; warnings: string[]; is_zip: boolean }>('/api/export', { method: 'POST', body: JSON.stringify({ clips, format }) }),
+  settings: () => request<SettingsData>('/api/settings'),
+  saveSettings: (values: Record<string, string>) => request<{ ok: boolean }>('/api/settings', { method: 'PUT', body: JSON.stringify({ values }) }),
+  saveSecrets: (body: { anthropic_api_key?: string; hf_token?: string }) => request<{ ok: boolean }>('/api/settings/secrets', { method: 'PUT', body: JSON.stringify(body) }),
+  doctor: () => request<{ ok: boolean; checks: DoctorCheck[] }>('/api/doctor'),
+  storage: () => request<StorageData>('/api/storage'),
+  cleanup: (id: string) => request<{ freed_bytes: number }>(`/api/projects/${id}/cleanup`, { method: 'POST' }),
+  brandKits: () => request<BrandKitData[]>('/api/brand'),
+  saveBrand: (kit: Record<string, unknown>) => request<{ ok: boolean }>(`/api/brand/${kit.id as string}`, { method: 'PUT', body: JSON.stringify(kit) }),
   updateYtdlp: () => request<{ ok: boolean; note: string }>('/api/ytdlp/update', { method: 'POST' }),
 }
 
