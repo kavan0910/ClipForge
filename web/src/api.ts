@@ -103,6 +103,9 @@ export interface ClipRow {
   risk_flags: string[]
   hook_check: { passed: boolean; missing: string[] }
   status: 'proposed' | 'approved' | 'rejected'
+  rendered: boolean
+  package_ready: boolean
+  package_path: string | null
   transcript: string
 }
 
@@ -186,6 +189,7 @@ export const api = {
   ytPublish: (id: string, cid: string, body: { schedule?: string; privacy?: string }) => request<{ state: string }>(`/api/projects/${id}/clips/${cid}/publish/youtube`, { method: 'POST', body: JSON.stringify(body) }),
   ytJob: (id: string, cid: string) => request<YtJob>(`/api/projects/${id}/clips/${cid}/publish/youtube`),
   updateYtdlp: () => request<{ ok: boolean; note: string }>('/api/ytdlp/update', { method: 'POST' }),
+  reveal: (path: string) => request<{ ok: boolean }>('/api/reveal', { method: 'POST', body: JSON.stringify({ path }) }),
 }
 
 const CHUNK = 8 * 1024 * 1024

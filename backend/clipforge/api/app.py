@@ -305,7 +305,41 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
 
         p = open_project(project_id)
         clips = await run_in_threadpool(load_clips, p)
-        return {"clips": [c.model_dump() for c in clips], "label": "Clip score (heuristic)"}
+        ready_dir = settings.data_dir.expanduser() / "exports" / "ready"
+        rows = [
+            {
+                **c.model_dump(),
+                "rendered": p.path("clips", c.id, "out.mp4").exists(),
+                "package_ready": (ready_dir / f"{project_id}-{c.id}" / "out.mp4").exists(),
+                "package_path": (
+                    str(ready_dir / f"{project_id}-{c.id}")
+                    if (ready_dir / f"{project_id}-{c.id}" / "out.mp4").exists()
+                    else None
+                ),
+            }
+            for c in clips
+        ]
+        return {"clips": rows, "label": "Clip score (heuristic)"}
+
+    class RevealRequest(BaseModel):
+        path: str
+
+    @app.post("/api/reveal")
+    async def reveal(req: RevealRequest) -> dict[str, bool]:
+        """Show a ready-to-upload package in Finder, so getting a clip onto the phone (AirDrop,
+        drag to Photos, etc.) for a manual TikTok/Instagram post is one click, not a path to type."""
+
+        def work() -> bool:
+            root = settings.data_dir.expanduser().resolve()
+            target = Path(req.path).resolve()
+            if not target.is_relative_to(root) or not target.exists():
+                raise HTTPException(400, "That path is not a Clipforge export.")
+            if sys.platform != "darwin":
+                return False
+            subprocess.run(["open", "-R", str(target)], check=False)
+            return True
+
+        return {"ok": await run_in_threadpool(work)}
 
     @app.post("/api/projects/{project_id}/recurate")
     async def recurate(project_id: str, req: Recurate) -> dict[str, Any]:

@@ -7,19 +7,25 @@ Options come from clips/<id>/render.json. Progress and the final state go to the
 from __future__ import annotations
 
 import json
+import logging
 import sys
 from pathlib import Path
 
+from clipforge import edits as clipedits
 from clipforge.brand import load_kit
 from clipforge.captions.stage import CaptionOptions
 from clipforge.config import get_settings
 from clipforge.curate.run import load_clips
+from clipforge.curate.schema import Clip
 from clipforge.errors import ClipforgeError
 from clipforge.pipeline import Reporter, load_source
 from clipforge.procs import Cancelled, CancelToken, cancel_on_signals
+from clipforge.publish import package
 from clipforge.render.clip import render_clip
 from clipforge.stages import load_transcript
 from clipforge.store import Project
+
+log = logging.getLogger(__name__)
 
 
 class _ClipReporter(Reporter):
@@ -56,6 +62,7 @@ def run(project: Project, clip_id: str) -> int:
         res = render_clip(project, source, tr, clip, opts.get("cleanup", "light"), bool(opts.get("fast")), False, reporter, cancel,
                           bool(opts.get("check_faces", False)), cuts, float(opts.get("punch_in", 1.0)), caps, kit, None, opts.get("upscale"))  # fmt: skip
         project.emit("render_done", clip=clip_id, seconds=round(res.seconds, 1), path=str(res.path))
+        _auto_package(project, clip_id, clip)
         return 0
     except Cancelled:
         project.emit("render_cancelled", clip=clip_id)
@@ -81,6 +88,21 @@ def run(project: Project, clip_id: str) -> int:
             action="See the project's logs.",
         )
         raise
+
+
+def _auto_package(project: Project, clip_id: str, clip: Clip) -> None:
+    """Build the 'ready to upload' package (video, thumbnail, captions, per-platform copy
+    including TikTok's) right after every successful render, so the only step left before
+    posting anywhere is approving the clip and grabbing the folder. Never fails the render."""
+    try:
+        e = clipedits.load_edits(project, clip_id)
+        dest = project.root.parent.parent / "exports" / "ready" / f"{project.id}-{clip_id}"
+        package.package_from_edits(
+            project.path("clips", clip_id), dest, e, clip.title, clip.hook, clip.description, clip.hashtags
+        )  # fmt: skip
+        project.emit("package_ready", clip=clip_id, path=str(dest))
+    except Exception:
+        log.warning("auto-package for clip %s failed", clip_id, exc_info=True)
 
 
 if __name__ == "__main__":

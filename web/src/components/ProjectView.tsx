@@ -101,6 +101,22 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
     return api.recurate(id, body).then(() => { void refresh(); listen() }).catch((e: { message?: string; action?: string }) => setActionError([e.message, e.action].filter(Boolean).join(' ')))
   }
 
+  // The best-ranked clip renders and packages itself in the background after clip selection
+  // finishes; the main job's event stream is long closed by then, so poll until it catches up
+  // (capped, in case auto-render is off or the clip was rejected before it finished).
+  const topCandidate = [...clips].filter((c) => c.status !== 'rejected').sort((a, b) => b.rank_score - a.rank_score)[0]
+  const awaitingAutoPackage = project?.status === 'done' && !!topCandidate && !topCandidate.package_ready
+  useEffect(() => {
+    if (!awaitingAutoPackage) return
+    let attempts = 0
+    const h = setInterval(() => {
+      attempts += 1
+      if (attempts > 60) { clearInterval(h); return }
+      void api.clips(id).then((r) => setClips(r.clips))
+    }, 3000)
+    return () => clearInterval(h)
+  }, [awaitingAutoPackage, id])
+
   if (!project) return <div className="grid gap-4" aria-busy="true"><div className="skeleton" style={{ height: 56 }} /><div className="skeleton" style={{ height: 260 }} /><div className="skeleton" style={{ height: 120 }} /></div>
   const running = project.status === 'running'
   const activeIndex = STEPS.findIndex((s) => !steps[s.key]?.done)

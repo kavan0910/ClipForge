@@ -2,14 +2,26 @@
 
 from __future__ import annotations
 
+import logging
+
+from clipforge import jobs
 from clipforge.config import Settings
 from clipforge.curate.run import CurateOutcome, CurateParams, curate
+from clipforge.curate.schema import Clip
 from clipforge.llm.meter import CostMeter, UsageRecord
 from clipforge.models import Source, Transcript
 from clipforge.pipeline import Reporter, load_source
 from clipforge.procs import CancelToken
 from clipforge.signals.stage import Signals, compute_signals, load_signals
 from clipforge.store import Project
+
+log = logging.getLogger(__name__)
+
+# Same defaults as the editor's "Render clip" button (RenderRequest in api/editor.py).
+DEFAULT_RENDER_OPTS = {
+    "fast": False, "template": None, "renderer": "auto", "captions": True,
+    "cleanup": "light", "punch_in": 1.0, "upscale": None,
+}  # fmt: skip
 
 
 def load_transcript(project: Project) -> Transcript:
@@ -48,4 +60,22 @@ def curate_project(
         meter=meter,
     )  # fmt: skip
     project.emit("clips_ready", count=len(outcome.clips), run_id=outcome.run_id, **outcome.usage)
+    if settings.auto_render_top:
+        _auto_render_top(project, outcome.clips)
     return outcome
+
+
+def _auto_render_top(project: Project, clips: list[Clip]) -> None:
+    """Start rendering the single best-ranked clip from this run in the background, so a
+    reviewable render (and, once it finishes, a ready-to-upload package for YouTube Shorts,
+    Instagram Reels and TikTok) is waiting with no click needed. The user still approves or
+    swaps the clip before posting anywhere. Best-effort: never fails clip selection."""
+    if not clips:
+        return
+    top = max(clips, key=lambda c: c.rank_score)
+    if top.status == "rejected" or project.path("clips", top.id, "out.mp4").exists():
+        return
+    try:
+        jobs.start_render(project, top.id, dict(DEFAULT_RENDER_OPTS))
+    except Exception:
+        log.warning("auto-render of top clip %s failed to start", top.id, exc_info=True)

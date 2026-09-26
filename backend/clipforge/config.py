@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     google_client_secret: SecretStr | None = Field(default=None, alias="GOOGLE_CLIENT_SECRET")
     data_dir: Path = Field(default=Path("~/Clipforge"), alias="DATA_DIR")
     render_workers: int | None = Field(default=None, alias="RENDER_WORKERS", ge=1)
+    auto_render_top: bool = Field(
+        default=True, alias="AUTO_RENDER_TOP"
+    )  # render the best-ranked new clip right after clip selection, no click needed
 
     @property
     def projects_dir(self) -> Path:

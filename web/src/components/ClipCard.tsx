@@ -1,4 +1,5 @@
-import type { ClipRow } from '../api'
+import { useState } from 'react'
+import { api, type ClipRow } from '../api'
 import { fmtDuration } from '../format'
 
 const DIMENSIONS: [string, string][] = [
@@ -23,6 +24,14 @@ export function ClipCard({
 }) {
   const score = Math.round(clip.rank_score * 100)
   const tone = clip.status === 'approved' ? 'ok' : clip.status === 'rejected' ? 'bad' : undefined
+  const [copied, setCopied] = useState(false)
+  const tiktokCaption = `${clip.hook} ${clip.hashtags.slice(0, 5).map((h) => `#${h}`).join(' ')}`.trim().slice(0, 2200)
+  const copyCaption = () => {
+    void navigator.clipboard.writeText(tiktokCaption).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
   return (
     <article className="card" data-testid="clip-card" data-hover="true" style={{ display: 'grid', gap: 14, opacity: clip.status === 'rejected' ? 0.62 : 1 }}>
       <header style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
@@ -66,6 +75,16 @@ export function ClipCard({
         <button className="btn btn-danger" aria-pressed={clip.status === 'rejected'} onClick={() => onDecide(clip.id, 'rejected')}>Reject</button>
         <button className="btn btn-primary" onClick={() => onOpen(clip.id)} data-testid="open-editor">Edit &amp; render</button>
       </footer>
+      {clip.package_ready && (
+        <div className="card" style={{ padding: 12, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', background: 'var(--surface-2)' }} role="status">
+          <span style={{ fontSize: 13 }}>📱 Ready to post &mdash; rendered and packaged for TikTok, Reels and Shorts.</span>
+          <button className="btn" onClick={copyCaption}>{copied ? 'Copied' : 'Copy TikTok caption'}</button>
+          {clip.package_path && <button className="btn" onClick={() => void api.reveal(clip.package_path!)}>Reveal in Finder</button>}
+        </div>
+      )}
+      {!clip.package_ready && clip.rendered && (
+        <p className="muted" style={{ margin: 0, fontSize: 12 }}>Rendered; building the ready-to-upload package&hellip;</p>
+      )}
     </article>
   )
 }

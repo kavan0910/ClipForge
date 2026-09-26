@@ -44,6 +44,8 @@ CLI: `clipforge run <url|path> --clips 8 --duration 30-60 --preset balanced --st
 - Audio-only sources (podcasts, .mp3/.m4a/.wav/.ogg/.flac) render as an audiogram: designed canvas, title, audio-reactive spectrum, same captions and loudness.
 - Publishing: upload to YouTube from the editor (OAuth, resumable, scheduling) or make a ready-to-upload package with copy for YouTube Shorts,
   Instagram Reels and TikTok.
+- Hands-off clip selection: the best-ranked clip from every run renders and packages itself in the background (`AUTO_RENDER_TOP=off` to disable),
+  so a TikTok-ready folder is usually waiting by the time you look at the results. See ADR-012.
 - Live progress over SSE, cancel (kills the whole process tree) and resume.
 
 ## Publishing
@@ -51,7 +53,9 @@ CLI: `clipforge run <url|path> --clips 8 --duration 30-60 --preset balanced --st
 YouTube: create a **Desktop app** OAuth client in Google Cloud Console (enable YouTube Data API v3), put the client id and secret in Settings,
 then choose Connect YouTube in a clip's Publish panel. Limits, all enforced by Google: about 6 uploads per day on the default quota; API projects
 that have not passed YouTube's compliance audit can only upload private videos; custom thumbnails need a verified channel. Scheduling keeps the
-video private until the chosen time. Instagram and TikTok have no upload API usable by a local app (ADR-010), so use the package.
+video private until the chosen time. Instagram and TikTok have no upload API usable by a local app (ADR-010), so use the package: every clip that
+finishes rendering builds its package automatically, and the clip card's "Reveal in Finder" button gets it to your phone (AirDrop, cable, etc.)
+in one click, caption already on the clipboard.
 
 ## Hardware notes
 
