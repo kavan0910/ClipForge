@@ -14,6 +14,7 @@ from pathlib import Path
 from clipforge import edits as clipedits
 from clipforge.brand import load_kit
 from clipforge.captions.stage import CaptionOptions
+from clipforge.character.render import render_character_edit
 from clipforge.config import get_settings
 from clipforge.curate.run import load_clips
 from clipforge.curate.schema import Clip
@@ -46,21 +47,25 @@ def run(project: Project, clip_id: str) -> int:
     project.emit("render_started", clip=clip_id)
     try:
         clip = next(c for c in load_clips(project) if c.id == clip_id)
-        source, tr = load_source(project), load_transcript(project)
-        sig = project.path("signals", "signals.json")
-        cuts = json.loads(sig.read_text()).get("scene_cuts", []) if sig.exists() else []
-        kit = load_kit(opts["brand"]) if opts.get("brand") else None
-        caps = (
-            None
-            if opts.get("captions") is False
-            else CaptionOptions(
-                opts.get("template") or (kit.default_template if kit else "karaoke-pop"),
-                opts.get("renderer", "auto"),
-                opts.get("hook", True),
+        source = load_source(project)
+        if clip.segments:  # a character edit: no transcript, words or captions involved
+            res = render_character_edit(project, source, clip, reporter, cancel)
+        else:
+            tr = load_transcript(project)
+            sig = project.path("signals", "signals.json")
+            cuts = json.loads(sig.read_text()).get("scene_cuts", []) if sig.exists() else []
+            kit = load_kit(opts["brand"]) if opts.get("brand") else None
+            caps = (
+                None
+                if opts.get("captions") is False
+                else CaptionOptions(
+                    opts.get("template") or (kit.default_template if kit else "karaoke-pop"),
+                    opts.get("renderer", "auto"),
+                    opts.get("hook", True),
+                )
             )
-        )
-        res = render_clip(project, source, tr, clip, opts.get("cleanup", "light"), bool(opts.get("fast")), False, reporter, cancel,
-                          bool(opts.get("check_faces", False)), cuts, float(opts.get("punch_in", 1.0)), caps, kit, None, opts.get("upscale"))  # fmt: skip
+            res = render_clip(project, source, tr, clip, opts.get("cleanup", "light"), bool(opts.get("fast")), False, reporter, cancel,
+                              bool(opts.get("check_faces", False)), cuts, float(opts.get("punch_in", 1.0)), caps, kit, None, opts.get("upscale"))  # fmt: skip
         project.emit("render_done", clip=clip_id, seconds=round(res.seconds, 1), path=str(res.path))
         _auto_package(project, clip_id, clip)
         return 0

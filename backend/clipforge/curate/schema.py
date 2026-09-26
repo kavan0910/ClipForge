@@ -108,3 +108,7 @@ class Clip(BaseModel):
     hook_check: HookCheck
     status: Literal["proposed", "approved", "rejected"] = "proposed"
     transcript: str = ""
+    # Set only for a character edit (backend/clipforge/character/): several disjoint source ranges
+    # cut together into one montage, instead of one continuous trimmed span. `start`/`end` are then
+    # just the bounding min/max for display, and `duration` is the actual (shorter) edit length.
+    segments: list[tuple[float, float]] | None = None

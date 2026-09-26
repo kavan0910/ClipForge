@@ -13,6 +13,7 @@ import sys
 import traceback
 from pathlib import Path
 
+from clipforge.character.pipeline import run_character_job
 from clipforge.config import get_settings
 from clipforge.curate.run import CurateParams
 from clipforge.errors import ClipforgeError
@@ -67,6 +68,10 @@ def run_job(project: Project) -> int:
             project.emit("job_done", clips=len(out.clips))
             return 0
         provider = build_provider(job["source"], settings)
+        if (
+            opts.get("mode") == "character_edit"
+        ):  # no transcript/ASR: this mode is visual, not spoken-word
+            return run_character_job(project, provider, settings, reporter, cancel, opts)
         src = ingest(
             project,
             provider,

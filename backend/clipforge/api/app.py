@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -52,6 +53,12 @@ class Options(BaseModel):
     diarize: bool = True
     audio_track: int | None = None
     brand_vocabulary: list[str] = Field(default_factory=list)
+    # Character-edit mode (backend/clipforge/character/): find a named character in the footage by
+    # vision instead of transcript, and cut a montage of their scenes. No ASR/curate options apply.
+    mode: Literal["clips", "character_edit"] = "clips"
+    character: str | None = None
+    reference_images: list[str] = Field(default_factory=list)  # base64, optionally data: URIs
+    target_duration: float = 30.0
 
 
 class CreateProject(BaseModel):
@@ -78,6 +85,26 @@ class AudioTrackRequest(BaseModel):
 class UploadCreate(BaseModel):
     filename: str
     size: int
+
+
+def _save_reference_images(project: Project, images: list[str]) -> list[str]:
+    """Decode a handful of small reference images (base64, optionally a data: URI) for character-
+    edit mode into the project folder; anything unreadable or oversized is silently dropped rather
+    than failing the whole project over a bad reference photo."""
+    paths: list[str] = []
+    for i, data in enumerate(images[:4]):
+        raw = data.split(",", 1)[-1] if data.startswith("data:") else data
+        try:
+            blob = base64.b64decode(raw, validate=False)
+        except (ValueError, TypeError):
+            continue
+        if not blob or len(blob) > 5_000_000:
+            continue
+        p = project.path("character", "refs", f"ref_{i}.jpg")
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(blob)
+        paths.append(str(p))
+    return paths
 
 
 def create_app(settings: Settings | None = None, token: str | None = None) -> FastAPI:
@@ -211,6 +238,8 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
                 raise MediaError("The upload is not finished.", "Wait for it to complete.")
         if spec.type == "path" and not spec.path:
             raise MediaError("No path given.", "Enter a file path.")
+        if req.options.mode == "character_edit" and not (req.options.character or "").strip():
+            raise MediaError("No character name given.", "Type the character's name.")
         pid = secrets.token_hex(4)
         project = Project.create(projects_dir, pid)
         title = spec.url or spec.path or "Uploaded file"
@@ -218,8 +247,14 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
             title = (await run_in_threadpool(uploads.status, spec.upload_id)).filename
         elif spec.type == "path" and spec.path:
             title = Path(spec.path).name  # not the whole path
-        project.path("project.json").write_text(json.dumps({"id": pid, "title": title}))
-        job = {"source": spec.model_dump(exclude_none=True), "options": req.options.model_dump()}
+        project.path("project.json").write_text(
+            json.dumps({"id": pid, "title": title, "mode": req.options.mode})
+        )
+        options = req.options.model_dump()
+        options["reference_images"] = await run_in_threadpool(
+            _save_reference_images, project, req.options.reference_images
+        )
+        job = {"source": spec.model_dump(exclude_none=True), "options": options}
         await run_in_threadpool(jobs.start, project, job)
         return {"project_id": pid}
 
@@ -242,7 +277,13 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
     @app.get("/api/projects/{project_id}")
     async def get_project(project_id: str) -> dict[str, Any]:
         p = open_project(project_id)
-        data: dict[str, Any] = {"id": p.id, "status": jobs.status(p)}
+        meta_file = p.path("project.json")
+        mode = (
+            json.loads(meta_file.read_text()).get("mode", "clips")
+            if meta_file.exists()
+            else "clips"
+        )
+        data: dict[str, Any] = {"id": p.id, "status": jobs.status(p), "mode": mode}
         src, tr = p.path("source", "source.json"), p.path("transcript", "transcript.json")
         if src.exists():
             s = json.loads(src.read_text())
@@ -321,6 +362,26 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
         ]
         return {"clips": rows, "label": "Clip score (heuristic)"}
 
+    class StatusRequest(BaseModel):
+        status: Literal["proposed", "approved", "rejected"]
+
+    @app.put("/api/projects/{project_id}/clips/{clip_id}/status")
+    async def set_clip_status(project_id: str, clip_id: str, req: StatusRequest) -> dict[str, bool]:
+        """Approve/reject a clip directly, with no editor round trip. Character-edit clips have no
+        transcript for the editor's EDL to work from, so this is their only way to decide a clip;
+        transcript-mode clips can use it too, whenever the rest of the editor's edits are not needed."""
+        from clipforge.curate.run import load_clips, save_clips
+
+        p = open_project(project_id)
+        clips = await run_in_threadpool(load_clips, p)
+        if not any(c.id == clip_id for c in clips):
+            raise HTTPException(404, "Clip not found")
+        updated = [
+            c.model_copy(update={"status": req.status}) if c.id == clip_id else c for c in clips
+        ]
+        await run_in_threadpool(save_clips, p, updated)
+        return {"ok": True}
+
     class RevealRequest(BaseModel):
         path: str
 
@@ -351,6 +412,11 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
                 "No Anthropic API key is configured.", "Add ANTHROPIC_API_KEY in Settings."
             )
         spec = json.loads(p.path("job.json").read_text())
+        if spec.get("options", {}).get("mode") == "character_edit":
+            raise ClipforgeError(
+                "Re-curate isn't available for character edits yet.",
+                "Start a new project to try a different character or footage.",
+            )
         spec["recurate"] = req.model_dump()
         pid = await run_in_threadpool(jobs.start, p, spec)
         return {"pid": pid}

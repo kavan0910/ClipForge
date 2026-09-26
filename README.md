@@ -1,8 +1,10 @@
 # Clipforge
 
 Local-first AI clipping studio: one long video in, ready-to-post vertical shorts out.
-Your video never leaves this machine. Only transcript text and light metadata go to the
-Anthropic API for the editorial step (Phase 2), and the UI says so.
+Your video never leaves this machine. In the default (clips) mode, only transcript text and light
+metadata go to the Anthropic API for the editorial step (Phase 2), and the UI says so. In
+character-edit mode (see below), small still-frame thumbnails — not the video itself — go to the
+API so it can tell whether the named character is on screen in each shot.
 
 **Status: all six phases built.** See `docs/checkpoints/phase-6.md` for the final report (measured performance, quality, cost, gaps). See `docs/PLAN.md` and `docs/checkpoints/`.
 
@@ -46,7 +48,20 @@ CLI: `clipforge run <url|path> --clips 8 --duration 30-60 --preset balanced --st
   Instagram Reels and TikTok.
 - Hands-off clip selection: the best-ranked clip from every run renders and packages itself in the background (`AUTO_RENDER_TOP=off` to disable),
   so a TikTok-ready folder is usually waiting by the time you look at the results. See ADR-012.
+- **Character-edit mode:** upload a full episode or movie, name a character, and get a short vertical
+  edit of their scenes — no transcript, dialogue or ASR involved. See "Character edit mode" below and ADR-013.
 - Live progress over SSE, cancel (kills the whole process tree) and resume.
+
+## Character edit mode
+
+Pick "Character edit" instead of "Clips" on the upload screen, name the character (reference images
+optional but help), and Clipforge finds their scenes by vision instead of transcript: it splits the
+video into shots (the same shot-detection signal the clips pipeline uses), sends small thumbnails of
+each shot to Claude in batches asking whether that character is on screen, then cuts the matched
+scenes into one montage with a colour grade and a per-shot push-in. No dialogue analysis, no ASR —
+this mode skips straight from ingest to the scan. One source file and one assembled edit per project
+for now; approve/reject and everything under "Publishing" below work the same as any other clip once
+it's rendered.
 
 ## Publishing
 

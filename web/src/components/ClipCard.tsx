@@ -16,11 +16,15 @@ export function ClipCard({
   onMoreLike,
   onOpen,
   onDecide,
+  characterMode = false,
 }: {
   clip: ClipRow
   onMoreLike: (id: string) => void
   onOpen: (id: string) => void
   onDecide: (id: string, status: 'approved' | 'rejected') => void
+  /** A character edit has no transcript, so the editor (trim/captions/scores) doesn't apply — only
+   * approve/reject and the publish step below do. */
+  characterMode?: boolean
 }) {
   const score = Math.round(clip.rank_score * 100)
   const tone = clip.status === 'approved' ? 'ok' : clip.status === 'rejected' ? 'bad' : undefined
@@ -54,26 +58,28 @@ export function ClipCard({
         </p>
       )}
       <p className="muted" style={{ margin: 0 }}>{clip.why_it_works}</p>
-      <details>
-        <summary className="muted" style={{ cursor: 'pointer' }}>Scores by dimension</summary>
-        <dl style={{ display: 'grid', gridTemplateColumns: '1fr 44px', gap: '6px 12px', margin: '10px 0 0' }}>
-          {DIMENSIONS.map(([k, label]) => (
-            <div key={k} style={{ display: 'contents' }}>
-              <dt>
-                <div style={{ fontSize: 13 }}>{label}</div>
-                <div className="bar"><i style={{ width: `${clip.scores[k]}%` }} /></div>
-              </dt>
-              <dd style={{ margin: 0, textAlign: 'right' }}>{clip.scores[k]}</dd>
-            </div>
-          ))}
-        </dl>
-      </details>
+      {!characterMode && (
+        <details>
+          <summary className="muted" style={{ cursor: 'pointer' }}>Scores by dimension</summary>
+          <dl style={{ display: 'grid', gridTemplateColumns: '1fr 44px', gap: '6px 12px', margin: '10px 0 0' }}>
+            {DIMENSIONS.map(([k, label]) => (
+              <div key={k} style={{ display: 'contents' }}>
+                <dt>
+                  <div style={{ fontSize: 13 }}>{label}</div>
+                  <div className="bar"><i style={{ width: `${clip.scores[k]}%` }} /></div>
+                </dt>
+                <dd style={{ margin: 0, textAlign: 'right' }}>{clip.scores[k]}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
+      )}
       <footer style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <span className="muted" style={{ flex: 1, fontSize: 13 }}>{clip.hashtags.map((h) => `#${h}`).join(' ')}</span>
-        <button className="btn" onClick={() => onMoreLike(clip.id)}>More like this</button>
+        {!characterMode && <button className="btn" onClick={() => onMoreLike(clip.id)}>More like this</button>}
         <button className="btn" aria-pressed={clip.status === 'approved'} onClick={() => onDecide(clip.id, 'approved')} data-testid="card-approve">Approve</button>
         <button className="btn btn-danger" aria-pressed={clip.status === 'rejected'} onClick={() => onDecide(clip.id, 'rejected')}>Reject</button>
-        <button className="btn btn-primary" onClick={() => onOpen(clip.id)} data-testid="open-editor">Edit &amp; render</button>
+        {!characterMode && <button className="btn btn-primary" onClick={() => onOpen(clip.id)} data-testid="open-editor">Edit &amp; render</button>}
       </footer>
       {clip.package_ready && (
         <div className="card" style={{ padding: 12, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', background: 'var(--surface-2)' }} role="status">

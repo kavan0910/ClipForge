@@ -6,6 +6,7 @@ and evals. The cost cap is checked before each call from a conservative worst ca
 
 from __future__ import annotations
 
+import base64
 import json
 import re
 import threading
@@ -31,8 +32,10 @@ class LLMError(ClipforgeError):
 
 @dataclass
 class Block:
-    text: str
+    text: str = ""
     cache: bool = False
+    image: bytes | None = None  # JPEG/PNG bytes; when set this block is an image, not text
+    image_media_type: str = "image/jpeg"
 
 
 def loose_schema(model: type[BaseModel]) -> dict[str, Any]:
@@ -65,6 +68,40 @@ def _extract_json(text: str) -> Any:
     text = text.strip()
     fence = re.match(r"^```(?:json)?\s*(.*?)\s*```$", text, re.S)
     return json.loads(fence.group(1) if fence else text)
+
+
+# Anthropic's documented ceiling for a single image (~1568px on the long edge). Our thumbnails are
+# much smaller, so this is a safe overestimate for the pre-call cap check, never the real cost.
+IMAGE_TOKEN_CEILING = 1600
+
+
+def _content_item(b: Block) -> dict[str, Any]:
+    item: dict[str, Any] = (
+        {"type": "image", "source": {"type": "base64", "media_type": b.image_media_type, "data": base64.b64encode(b.image).decode()}}
+        if b.image is not None
+        else {"type": "text", "text": b.text}
+    )  # fmt: skip
+    if b.cache:
+        item["cache_control"] = {"type": "ephemeral"}
+    return item
+
+
+def _estimate_message_tokens(messages: list[dict[str, Any]]) -> int:
+    """Text is estimated by length; each image counts as a flat conservative ceiling (its base64
+    payload must never be fed to the character-count estimator, or the pre-call cap check would
+    see it as tens of thousands of "tokens" and refuse a call that actually costs cents)."""
+    total = 32
+    for m in messages:
+        content = m.get("content")
+        if isinstance(content, str):
+            total += estimate_tokens(content)
+            continue
+        for item in content or []:
+            if item.get("type") == "image":
+                total += IMAGE_TOKEN_CEILING
+            else:
+                total += estimate_tokens(item.get("text", ""))
+    return total
 
 
 class LLMClient:
@@ -121,7 +158,7 @@ class LLMClient:
         return req
 
     def _call(self, stage: str, model: str, req: dict[str, Any]) -> anthropic.types.Message:
-        est = estimate_tokens(json.dumps(req["messages"]) + json.dumps(req["system"]))
+        est = _estimate_message_tokens(req["messages"]) + estimate_tokens(json.dumps(req["system"]))
         self.meter.check(model, est, req["max_tokens"])
         try:
             resp = self.client.messages.create(**req)
@@ -154,12 +191,7 @@ class LLMClient:
     ) -> T:  # fmt: skip
         """One structured call with a single repair retry on invalid output."""
         schema = loose_schema(model_cls)
-        content: list[dict[str, Any]] = []
-        for b in blocks:
-            item: dict[str, Any] = {"type": "text", "text": b.text}
-            if b.cache:
-                item["cache_control"] = {"type": "ephemeral"}
-            content.append(item)
+        content: list[dict[str, Any]] = [_content_item(b) for b in blocks]
         messages: list[dict[str, Any]] = [{"role": "user", "content": content}]
         mode = self._mode.get(model, "json")
         last_err = ""

@@ -4,14 +4,24 @@ import { ClipCard } from './ClipCard'
 import { CostMeter } from './CostMeter'
 import { fmtBytes, fmtDuration, fmtEta } from '../format'
 
-const STEPS = [
+interface Step { key: string; label: string }
+
+const STEPS: Step[] = [
   { key: 'acquire', label: 'Get the video' },
   { key: 'audio', label: 'Prepare audio' },
   { key: 'proxy', label: 'Build preview proxy' },
   { key: 'transcribe', label: 'Transcribe with word timing' },
   { key: 'signals', label: 'Measure audio, motion and audience signals' },
   { key: 'curate', label: 'Find, score and refine clips' },
-] as const
+]
+
+// Character-edit mode has no transcript/ASR stage at all: it works from shots, not dialogue.
+const CHARACTER_STEPS: Step[] = [
+  { key: 'acquire', label: 'Get the video' },
+  { key: 'proxy', label: 'Build preview proxy' },
+  { key: 'signals', label: 'Detect shots and motion' },
+  { key: 'curate', label: 'Scan frames for the character' },
+]
 
 interface StepState {
   pct: number | null
@@ -118,10 +128,12 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
   }, [awaitingAutoPackage, id])
 
   if (!project) return <div className="grid gap-4" aria-busy="true"><div className="skeleton" style={{ height: 56 }} /><div className="skeleton" style={{ height: 260 }} /><div className="skeleton" style={{ height: 120 }} /></div>
+  const characterMode = project.mode === 'character_edit'
+  const stepsList = characterMode ? CHARACTER_STEPS : STEPS
   const running = project.status === 'running'
-  const activeIndex = STEPS.findIndex((s) => !steps[s.key]?.done)
+  const activeIndex = stepsList.findIndex((s) => !steps[s.key]?.done)
 
-  const visible = STEPS.filter((s) => !(s.key === 'proxy' && project.source && !project.source.probe.video && !running))
+  const visible = stepsList.filter((s) => !(s.key === 'proxy' && project.source && !project.source.probe.video && !running))
   const stateOf = (key: string, i: number) => {
     const st = steps[key]
     if (st?.done || project.status === 'done') return 'done'
@@ -129,7 +141,7 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
     if (project.status === 'error' && i === activeIndex) return 'error'
     return 'idle'
   }
-  const states = visible.map((s) => stateOf(s.key, STEPS.indexOf(s)))
+  const states = visible.map((s) => stateOf(s.key, stepsList.indexOf(s)))
   const doneCount = states.filter((x) => x === 'done').length
   const activeStep = visible.find((_, i) => states[i] === 'active')
   const activePct = activeStep ? (steps[activeStep.key]?.pct ?? 0) : 0
@@ -137,7 +149,7 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
   const overall = finished ? 1 : Math.min((doneCount + activePct) / visible.length, 0.999)
   const pctText = `${Math.round(overall * 100)}%`
   // Only the AI steps cost money; every other step runs on this computer. Unknown cost stages belong to clip selection.
-  const stepOf = (stage: string) => (STEPS.some((x) => x.key === (STAGE_ALIAS[stage] ?? stage)) ? (STAGE_ALIAS[stage] ?? stage) : 'curate')
+  const stepOf = (stage: string) => (stepsList.some((x) => x.key === (STAGE_ALIAS[stage] ?? stage)) ? (STAGE_ALIAS[stage] ?? stage) : 'curate')
   const stepCost = (key: string) => Object.entries(stageCost).filter(([k]) => stepOf(k) === key).reduce((a, [, v]) => a + v, 0)
   const breakdown = (key: string) => Object.entries(stageCost).filter(([k]) => stepOf(k) === key).map(([k, v]) => `${k}: ${fmtUsd(v)}`).join(' · ')
   const fmtUsd = (v: number) => `$${v < 0.01 ? v.toFixed(4) : v.toFixed(2)}`
@@ -254,11 +266,13 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
 
       {project.curation_error && clips.length === 0 && (
         <div className="alert" role="alert" data-testid="curation-error">
-          <strong>Clip selection did not run: {project.curation_error.message}</strong>
+          <strong>{characterMode ? 'The scan found nothing' : 'Clip selection did not run'}: {project.curation_error.message}</strong>
           {project.curation_error.action && <p style={{ margin: '4px 0 0' }}>{project.curation_error.action}</p>}
-          <button className="btn" style={{ marginTop: 8 }} onClick={() => recurate({ mode: 'fresh' })}>
-            Retry clip selection
-          </button>
+          {!characterMode && (
+            <button className="btn" style={{ marginTop: 8 }} onClick={() => recurate({ mode: 'fresh' })}>
+              Retry clip selection
+            </button>
+          )}
         </div>
       )}
 
@@ -274,16 +288,30 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
 
       {clips.length > 0 && (
         <section aria-label="Clips" className="grid gap-3">
-          <h3 style={{ fontSize: 16 }} data-testid="clips-ready">{clips.length} clips proposed</h3>
+          <h3 style={{ fontSize: 16 }} data-testid="clips-ready">{clips.length} {characterMode ? (clips.length === 1 ? 'edit' : 'edits') : 'clips'} proposed</h3>
           {clips.map((c) => (
-            <ClipCard key={c.id} clip={c} onOpen={(cid) => { window.location.hash = `#/p/${id}/c/${cid}` }} onDecide={(cid, status) => void api.editor(id, cid).then((d) => api.saveEdits(id, cid, { ...d.edits, status })).then(refresh)} onMoreLike={(cid) => recurate({ mode: 'more_like', reference_clip_id: cid })} />
+            <ClipCard
+              key={c.id}
+              clip={c}
+              characterMode={characterMode}
+              onOpen={(cid) => { window.location.hash = `#/p/${id}/c/${cid}` }}
+              onDecide={(cid, status) =>
+                void (characterMode
+                  ? api.setClipStatus(id, cid, status)
+                  : api.editor(id, cid).then((d) => api.saveEdits(id, cid, { ...d.edits, status }))
+                ).then(refresh)
+              }
+              onMoreLike={(cid) => recurate({ mode: 'more_like', reference_clip_id: cid })}
+            />
           ))}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn" onClick={() => recurate({ mode: 'shorter' })}>Shorter</button>
-            <button className="btn" onClick={() => recurate({ mode: 'different_topic' })}>Different topic</button>
-            <input className="field" style={{ flex: 1, minWidth: 200 }} placeholder="Steer: e.g. find the funniest moments" aria-label="Steering text" value={steer} onChange={(e) => setSteer(e.target.value)} />
-            <button className="btn" disabled={!steer.trim()} onClick={() => recurate({ mode: 'fresh', steering: steer })}>Re-curate</button>
-          </div>
+          {!characterMode && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn" onClick={() => recurate({ mode: 'shorter' })}>Shorter</button>
+              <button className="btn" onClick={() => recurate({ mode: 'different_topic' })}>Different topic</button>
+              <input className="field" style={{ flex: 1, minWidth: 200 }} placeholder="Steer: e.g. find the funniest moments" aria-label="Steering text" value={steer} onChange={(e) => setSteer(e.target.value)} />
+              <button className="btn" disabled={!steer.trim()} onClick={() => recurate({ mode: 'fresh', steering: steer })}>Re-curate</button>
+            </div>
+          )}
         </section>
       )}
 

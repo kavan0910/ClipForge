@@ -81,6 +81,7 @@ export interface AudioTrackInfo { index: number; codec: string; channels: number
 export interface ProjectData {
   id: string
   status: 'idle' | 'running' | 'done' | 'error' | 'cancelled'
+  mode: 'clips' | 'character_edit'
   source?: { title: string; kind: string; quality: Quality; probe: { duration: number; video: unknown | null } }
   transcript?: { language: string; asr_model: string; duration: number; words: number; sentences: SentenceRow[]; diarized: boolean; skipped?: { start: number; end: number; language: string }[] }
   error?: { code: string; message: string; action: string; tracks?: AudioTrackInfo[] }
@@ -147,17 +148,26 @@ export interface DoctorCheck { name: string; status: 'ok' | 'warn' | 'fail'; det
 export interface StorageData { projects: { id: string; bytes: number; intermediate_bytes: number }[]; total_bytes: number; free_bytes: number }
 export interface BrandKitData { id: string; name: string; text_color: string | null; accent_color: string | null; default_template: string; vocabulary: string[]; logo: unknown; intro: { title: string } | null; outro: { title: string } | null }
 export interface YtJob { state: 'idle' | 'running' | 'done' | 'error'; pct: number; url?: string; scheduled_for?: string | null; warnings?: string[]; message?: string; action?: string }
-export interface ProjectRow { id: string; title: string; status: string }
+export interface ProjectRow { id: string; title: string; status: string; mode?: 'clips' | 'character_edit' }
 
 export type SourceSpec =
   | { type: 'url'; url: string }
   | { type: 'upload'; upload_id: string }
   | { type: 'path'; path: string }
 
+/** Character-edit mode (backend/clipforge/character/): find a named character by vision instead
+ * of transcript, and cut a montage of their scenes. `reference_images` are base64 (or data: URIs). */
+export interface CreateOptions {
+  mode?: 'clips' | 'character_edit'
+  character?: string
+  reference_images?: string[]
+  target_duration?: number
+}
+
 export const api = {
   resolve: (url: string) => request<UrlPreview>('/api/sources/resolve', { method: 'POST', body: JSON.stringify({ url }) }),
-  createProject: (source: SourceSpec) =>
-    request<{ project_id: string }>('/api/projects', { method: 'POST', body: JSON.stringify({ source, options: {} }) }),
+  createProject: (source: SourceSpec, options: CreateOptions = {}) =>
+    request<{ project_id: string }>('/api/projects', { method: 'POST', body: JSON.stringify({ source, options }) }),
   project: (id: string) => request<ProjectData>(`/api/projects/${id}`),
   cancel: (id: string) => request<{ cancelled: boolean }>(`/api/projects/${id}/cancel`, { method: 'POST' }),
   chooseAudioTrack: (id: string, track: number) => request<{ pid: number }>(`/api/projects/${id}/audio-track`, { method: 'POST', body: JSON.stringify({ track }) }),
@@ -169,6 +179,8 @@ export const api = {
   projects: () => request<ProjectRow[]>('/api/projects'),
   editor: (id: string, cid: string) => request<EditorData>(`/api/projects/${id}/clips/${cid}/editor`),
   saveEdits: (id: string, cid: string, e: ClipEdits) => request<{ ok: boolean }>(`/api/projects/${id}/clips/${cid}/edits`, { method: 'PUT', body: JSON.stringify(e) }),
+  setClipStatus: (id: string, cid: string, status: 'proposed' | 'approved' | 'rejected') =>
+    request<{ ok: boolean }>(`/api/projects/${id}/clips/${cid}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
   timeline: (id: string, cid: string, template?: string) => request<{ timeline: unknown; template: unknown }>(`/api/projects/${id}/clips/${cid}/timeline${template ? `?template=${template}` : ''}`),
   render: (id: string, cid: string, body: Record<string, unknown> = {}) => request<{ pid: number }>(`/api/projects/${id}/clips/${cid}/render`, { method: 'POST', body: JSON.stringify(body) }),
   cancelRender: (id: string, cid: string) => request<{ cancelled: boolean }>(`/api/projects/${id}/clips/${cid}/render/cancel`, { method: 'POST' }),
