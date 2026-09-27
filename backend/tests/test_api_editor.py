@@ -1,4 +1,5 @@
 import json
+import os
 
 import pytest
 from fastapi.testclient import TestClient
@@ -28,8 +29,16 @@ def env(tmp_path, monkeypatch):
     )
     save_clips(project, [c])
     app = create_app(Settings(DATA_DIR=tmp_path / "data"), token=TOKEN)
-    with TestClient(app, headers={"x-clipforge-token": TOKEN}) as client:
-        yield client, project, tmp_path
+    # settings_store.write_env() sets os.environ directly (so the running process picks up a saved
+    # setting without a restart) - a raw dict write monkeypatch never sees or reverts, so a test that
+    # PUTs a setting leaks it into every test that runs afterward in this process. Restore by hand.
+    env_snapshot = dict(os.environ)
+    try:
+        with TestClient(app, headers={"x-clipforge-token": TOKEN}) as client:
+            yield client, project, tmp_path
+    finally:
+        os.environ.clear()
+        os.environ.update(env_snapshot)
 
 
 def test_editor_payload_has_words_edl_files_and_templates(env):

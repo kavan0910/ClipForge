@@ -9,6 +9,34 @@ from clipforge.procs import CancelToken
 from clipforge.store import Project
 
 
+def test_recurate_params_falls_back_to_project_options_when_unset():
+    """A Recurate.model_dump() always carries min_duration/max_duration, as None when the client
+    didn't set them (e.g. the Shorter/Different topic/steered Re-curate buttons never send them) -
+    that must not be mistaken for "use None", which crashes curate()'s prompt formatting."""
+    r = {"mode": "fresh", "min_duration": None, "max_duration": None}
+    p = jobrunner.recurate_params(r, {"min_duration": 25.0, "max_duration": 80.0})
+    assert (p.min_duration, p.max_duration) == (25.0, 80.0)
+
+
+def test_recurate_params_falls_back_to_the_curate_defaults_with_no_project_options_either():
+    r = {"mode": "fresh", "min_duration": None, "max_duration": None}
+    p = jobrunner.recurate_params(r, {})
+    assert (p.min_duration, p.max_duration) == (20.0, 90.0)
+
+
+def test_recurate_params_uses_the_caller_supplied_duration():
+    """The "Try 1-2 minute clips again" button sends these explicitly."""
+    r = {"mode": "fresh", "min_duration": 60.0, "max_duration": 120.0}
+    p = jobrunner.recurate_params(r, {"min_duration": 20.0, "max_duration": 90.0})
+    assert (p.min_duration, p.max_duration) == (60.0, 120.0)
+
+
+def test_recurate_params_caps_shorter_mode_at_45s_even_over_a_requested_max():
+    r = {"mode": "shorter", "min_duration": None, "max_duration": 90.0}
+    p = jobrunner.recurate_params(r, {})
+    assert p.max_duration == 45.0
+
+
 def test_empty_initial_curation_retries_for_60_to_120_second_clips(monkeypatch):
     calls = []
     settings_seen = []
@@ -25,7 +53,11 @@ def test_empty_initial_curation_retries_for_60_to_120_second_clips(monkeypatch):
     monkeypatch.setattr(jobrunner, "curate_project", curate)
     reporter = cast(Reporter, SimpleNamespace(progress=lambda *args, **kwargs: None))
     result = jobrunner.curate_with_longer_fallback(
-        cast(Project, object()), Settings(), reporter, cast(CancelToken, object()), CurateParams()
+        cast(Project, object()),
+        Settings(MAX_JOB_COST_USD=1.0),  # explicit: never depend on the real .env's ambient value
+        reporter,
+        cast(CancelToken, object()),
+        CurateParams(),
     )
 
     assert result.clips == ["long-clip"]
@@ -44,7 +76,11 @@ def test_successful_initial_curation_does_not_retry(monkeypatch):
     monkeypatch.setattr(jobrunner, "curate_project", curate)
     reporter = cast(Reporter, SimpleNamespace(progress=lambda *args, **kwargs: None))
     result = jobrunner.curate_with_longer_fallback(
-        cast(Project, object()), Settings(), reporter, cast(CancelToken, object()), CurateParams()
+        cast(Project, object()),
+        Settings(MAX_JOB_COST_USD=1.0),
+        reporter,
+        cast(CancelToken, object()),
+        CurateParams(),
     )
 
     assert result.clips == ["clip"]
@@ -62,7 +98,7 @@ def test_empty_60_to_120_second_pass_does_not_loop(monkeypatch):
     reporter = cast(Reporter, SimpleNamespace(progress=lambda *args, **kwargs: None))
     result = jobrunner.curate_with_longer_fallback(
         cast(Project, object()),
-        Settings(),
+        Settings(MAX_JOB_COST_USD=1.0),
         reporter,
         cast(CancelToken, object()),
         CurateParams(min_duration=60, max_duration=120),

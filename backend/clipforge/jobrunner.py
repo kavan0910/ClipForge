@@ -30,6 +30,24 @@ from clipforge.store import Project
 from clipforge.uploads import UploadSource, UploadStore
 
 
+def recurate_params(r: dict, opts: dict) -> CurateParams:
+    """CurateParams for a manual re-curate request. `r` is a Recurate.model_dump(): every field is
+    present even when the client didn't set it, as `None` — so `r.get("min_duration", fallback)`
+    would return that `None` instead of `fallback` (the key exists; `.get`'s default only applies
+    when a key is *absent*). Duration must fall back explicitly, or an unset request crashes
+    curate()'s prompt formatting on `None`, not just quietly lose the caller's fallback."""
+    rmin, rmax = r.get("min_duration"), r.get("max_duration")
+    params = CurateParams(
+        n_clips=r.get("clips"), steering=r.get("steering", ""), preset=r.get("preset", "balanced"),
+        mode=r["mode"], reference_clip_id=r.get("reference_clip_id"),
+        min_duration=rmin if rmin is not None else opts.get("min_duration", 20.0),
+        max_duration=rmax if rmax is not None else opts.get("max_duration", 90.0),
+    )  # fmt: skip
+    if r["mode"] == "shorter":
+        params.max_duration = min(params.max_duration, 45.0)
+    return params
+
+
 def curate_with_longer_fallback(
     project: Project,
     settings: Settings,
@@ -90,14 +108,7 @@ def run_job(project: Project) -> int:
         if "recurate" in job:  # re-curation only: no ingest, transcription or signals
             r = job.pop("recurate")
             project.path("job.json").write_text(json.dumps(job))
-            params = CurateParams(
-                n_clips=r.get("clips"), steering=r.get("steering", ""), preset=r.get("preset", "balanced"),
-                mode=r["mode"], reference_clip_id=r.get("reference_clip_id"),
-                min_duration=r.get("min_duration", opts.get("min_duration", 20.0)),
-                max_duration=r.get("max_duration", opts.get("max_duration", 90.0)),
-            )  # fmt: skip
-            if r["mode"] == "shorter":
-                params.max_duration = min(params.max_duration, 45.0)
+            params = recurate_params(r, opts)
             out = curate_project(project, settings, reporter, cancel, params)
             project.emit("job_done", clips=len(out.clips))
             return 0
