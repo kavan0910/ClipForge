@@ -11,11 +11,12 @@ import contextlib
 import json
 import sys
 import traceback
+from dataclasses import replace
 from pathlib import Path
 
 from clipforge.character.pipeline import run_character_job
-from clipforge.config import get_settings
-from clipforge.curate.run import CurateParams
+from clipforge.config import Settings, get_settings
+from clipforge.curate.run import CurateOutcome, CurateParams
 from clipforge.errors import ClipforgeError
 from clipforge.parallel import Background
 from clipforge.pipeline import IngestOptions, Reporter, ensure_proxy, ingest, transcribe
@@ -27,6 +28,38 @@ from clipforge.signals.stage import precompute_events, precompute_visual
 from clipforge.stages import curate_project
 from clipforge.store import Project
 from clipforge.uploads import UploadSource, UploadStore
+
+
+def curate_with_longer_fallback(
+    project: Project,
+    settings: Settings,
+    reporter: Reporter,
+    cancel: CancelToken,
+    params: CurateParams,
+) -> CurateOutcome:
+    """Retry an empty initial selection once with 60-120 second clips."""
+    outcome = curate_project(project, settings, reporter, cancel, params)
+    if outcome.clips or (params.min_duration == 60.0 and params.max_duration == 120.0):
+        return outcome
+
+    remaining_budget = settings.max_job_cost_usd - outcome.usage.get("usd", 0.0)
+    if remaining_budget <= 0:
+        reporter.progress(
+            "curate", None, note="Longer-clip retry skipped because the job cost cap was reached"
+        )
+        return outcome
+
+    reporter.progress(
+        "curate", None, note="No clips in the requested duration; retrying for 60-120 second clips"
+    )
+    retry_settings = settings.model_copy(update={"max_job_cost_usd": remaining_budget})
+    return curate_project(
+        project,
+        retry_settings,
+        reporter,
+        cancel,
+        replace(params, min_duration=60.0, max_duration=120.0),
+    )
 
 
 def build_provider(spec: dict, settings) -> SourceProvider:
@@ -60,7 +93,8 @@ def run_job(project: Project) -> int:
             params = CurateParams(
                 n_clips=r.get("clips"), steering=r.get("steering", ""), preset=r.get("preset", "balanced"),
                 mode=r["mode"], reference_clip_id=r.get("reference_clip_id"),
-                min_duration=opts.get("min_duration", 20.0), max_duration=opts.get("max_duration", 90.0),
+                min_duration=r.get("min_duration", opts.get("min_duration", 20.0)),
+                max_duration=r.get("max_duration", opts.get("max_duration", 90.0)),
             )  # fmt: skip
             if r["mode"] == "shorter":
                 params.max_duration = min(params.max_duration, 45.0)
@@ -119,7 +153,9 @@ def run_job(project: Project) -> int:
                     min_duration=opts.get("min_duration", 20.0), max_duration=opts.get("max_duration", 90.0),
                 )  # fmt: skip
                 try:
-                    clips = curate_project(project, settings, reporter, cancel, params).clips
+                    clips = curate_with_longer_fallback(
+                        project, settings, reporter, cancel, params
+                    ).clips
                 except ClipforgeError as e:
                     # Isolated failure: the transcript and signals are still valid and usable.
                     project.emit("stage_error", stage="curate", **e.to_dict())

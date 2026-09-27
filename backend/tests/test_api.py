@@ -1,8 +1,10 @@
 import json
 import time
+from importlib import import_module
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from clipforge.api.app import create_app
 from clipforge.config import Settings
@@ -22,8 +24,48 @@ def test_token_and_host_guards(tmp_path):
     with TestClient(app) as c:
         assert c.post("/api/uploads", json={"filename": "a.mp4", "size": 5}).status_code == 403
         assert c.get("/api/health").status_code == 200
+    with TestClient(app, base_url="http://192.168.1.42:8765") as c:
+        assert c.get("/api/health").status_code == 200
     with TestClient(app, base_url="http://evil.example.com") as c:
         assert c.get("/api/health").status_code == 403
+
+
+def test_reveal_accepts_json_export_path(client, tmp_path):
+    export = tmp_path / "exports" / "ready" / "project-clip"
+    export.mkdir(parents=True)
+    (export / "out.mp4").touch()
+    response = client.post("/api/reveal", json={"path": str(export)})
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+
+
+def test_recurate_accepts_longer_duration_limits(client, tmp_path, monkeypatch):
+    from clipforge.store import Project
+
+    project = Project.create(tmp_path / "projects", "p123")
+    project.path("job.json").write_text(
+        json.dumps({"options": {"min_duration": 20, "max_duration": 90}})
+    )
+    captured = {}
+    api_app = import_module("clipforge.api.app")
+    monkeypatch.setattr(
+        api_app,
+        "get_settings",
+        lambda: Settings(DATA_DIR=tmp_path).model_copy(
+            update={"anthropic_api_key": SecretStr("configured")}
+        ),
+    )
+    monkeypatch.setattr(api_app.jobs, "start", lambda p, spec: captured.update(spec) or 1)
+
+    response = client.post(
+        "/api/projects/p123/recurate",
+        json={"mode": "fresh", "min_duration": 60, "max_duration": 120},
+    )
+
+    assert response.status_code == 200
+    assert captured["recurate"]["min_duration"] == 60
+    assert captured["recurate"]["max_duration"] == 120
 
 
 def test_resolve_rejects_bad_urls_with_actionable_error(client):

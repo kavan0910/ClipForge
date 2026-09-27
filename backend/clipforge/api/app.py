@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import ipaddress
 import json
 import logging
 import os
@@ -26,6 +27,7 @@ from clipforge.config import Settings, get_settings
 from clipforge.doctor import run_doctor
 from clipforge.errors import ClipforgeError, MediaError
 from clipforge.providers import url as url_provider
+from clipforge.publish import tiktok_preflight
 from clipforge.store import Project
 from clipforge.uploads import OffsetMismatch, UploadStore
 
@@ -76,6 +78,8 @@ class Recurate(BaseModel):
     steering: str = ""
     clips: int | None = None
     preset: str = "balanced"
+    min_duration: float | None = Field(default=None, ge=1, le=600)
+    max_duration: float | None = Field(default=None, ge=1, le=600)
 
 
 class AudioTrackRequest(BaseModel):
@@ -85,6 +89,14 @@ class AudioTrackRequest(BaseModel):
 class UploadCreate(BaseModel):
     filename: str
     size: int
+
+
+class StatusRequest(BaseModel):
+    status: Literal["proposed", "approved", "rejected"]
+
+
+class RevealRequest(BaseModel):
+    path: str
 
 
 def _save_reference_images(project: Project, images: list[str]) -> list[str]:
@@ -120,10 +132,20 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
     app = FastAPI(title="Clipforge", docs_url=None, redoc_url=None)
     app.state.token = token
 
+    def allow_host(host: str) -> bool:
+        host = host.strip("[]")
+        if host in {"127.0.0.1", "localhost", "[::1]", "::1", "testserver"}:
+            return True
+        try:
+            ip = ipaddress.ip_address(host)
+        except ValueError:
+            return False
+        return ip.is_loopback or ip.is_private or ip.is_link_local or ip.is_unspecified
+
     @app.middleware("http")
     async def guard(request: Request, call_next):
         host = (request.headers.get("host") or "").split(":")[0]
-        if host not in {"127.0.0.1", "localhost", "[::1]", "testserver"}:
+        if not allow_host(host):
             return JSONResponse({"code": "bad_host", "message": "Host not allowed."}, 403)
         if (
             request.url.path.startswith("/api")
@@ -224,6 +246,20 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
     async def cancel_upload(upload_id: str) -> dict[str, bool]:
         await run_in_threadpool(uploads.cancel, upload_id)
         return {"ok": True}
+
+    @app.post("/api/tiktok-preflight/{upload_id}")
+    async def check_uploaded_tiktok_clip(upload_id: str) -> dict[str, Any]:
+        try:
+            path = await run_in_threadpool(uploads.completed_path, upload_id)
+            try:
+                return await run_in_threadpool(tiktok_preflight.inspect_video, path)
+            except ValueError as ex:
+                raise HTTPException(422, str(ex)) from None
+        finally:
+            try:
+                await run_in_threadpool(uploads.cancel, upload_id)
+            except ClipforgeError:
+                pass
 
     # -- projects -------------------------------------------------------------
     @app.post("/api/projects")
@@ -362,9 +398,6 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
         ]
         return {"clips": rows, "label": "Clip score (heuristic)"}
 
-    class StatusRequest(BaseModel):
-        status: Literal["proposed", "approved", "rejected"]
-
     @app.put("/api/projects/{project_id}/clips/{clip_id}/status")
     async def set_clip_status(project_id: str, clip_id: str, req: StatusRequest) -> dict[str, bool]:
         """Approve/reject a clip directly, with no editor round trip. Character-edit clips have no
@@ -381,9 +414,6 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
         ]
         await run_in_threadpool(save_clips, p, updated)
         return {"ok": True}
-
-    class RevealRequest(BaseModel):
-        path: str
 
     @app.post("/api/reveal")
     async def reveal(req: RevealRequest) -> dict[str, bool]:

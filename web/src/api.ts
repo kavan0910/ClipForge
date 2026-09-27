@@ -148,6 +148,7 @@ export interface DoctorCheck { name: string; status: 'ok' | 'warn' | 'fail'; det
 export interface StorageData { projects: { id: string; bytes: number; intermediate_bytes: number }[]; total_bytes: number; free_bytes: number }
 export interface BrandKitData { id: string; name: string; text_color: string | null; accent_color: string | null; default_template: string; vocabulary: string[]; logo: unknown; intro: { title: string } | null; outro: { title: string } | null }
 export interface YtJob { state: 'idle' | 'running' | 'done' | 'error'; pct: number; url?: string; scheduled_for?: string | null; warnings?: string[]; message?: string; action?: string }
+export interface TikTokPreflight { checks: { name: string; status: 'ok' | 'review'; detail: string; action: string }[]; review_count: number; notice: string }
 export interface ProjectRow { id: string; title: string; status: string; mode?: 'clips' | 'character_edit' }
 
 export type SourceSpec =
@@ -174,7 +175,7 @@ export const api = {
   resume: (id: string) => request<{ pid: number }>(`/api/projects/${id}/resume`, { method: 'POST' }),
   remove: (id: string) => request<{ ok: boolean }>(`/api/projects/${id}`, { method: 'DELETE' }),
   clips: (id: string) => request<{ clips: ClipRow[]; label: string }>(`/api/projects/${id}/clips`),
-  recurate: (id: string, body: { mode: string; reference_clip_id?: string; steering?: string }) =>
+  recurate: (id: string, body: { mode: string; reference_clip_id?: string; steering?: string; min_duration?: number; max_duration?: number }) =>
     request<{ pid: number }>(`/api/projects/${id}/recurate`, { method: 'POST', body: JSON.stringify(body) }),
   projects: () => request<ProjectRow[]>('/api/projects'),
   editor: (id: string, cid: string) => request<EditorData>(`/api/projects/${id}/clips/${cid}/editor`),
@@ -195,6 +196,8 @@ export const api = {
   brandKits: () => request<BrandKitData[]>('/api/brand'),
   saveBrand: (kit: Record<string, unknown>) => request<{ ok: boolean }>(`/api/brand/${kit.id as string}`, { method: 'PUT', body: JSON.stringify(kit) }),
   makePackage: (id: string, cid: string) => request<{ path: string }>(`/api/projects/${id}/clips/${cid}/package`, { method: 'POST' }),
+  tiktokPreflight: (id: string, cid: string) => request<TikTokPreflight>(`/api/projects/${id}/clips/${cid}/tiktok-preflight`),
+  tiktokPreflightUpload: (uploadId: string) => request<TikTokPreflight>(`/api/tiktok-preflight/${uploadId}`, { method: 'POST' }),
   ytStatus: () => request<{ configured: boolean; connected: boolean; message?: string; action?: string }>('/api/publish/youtube/status'),
   ytConnect: () => request<{ connected: boolean }>('/api/publish/youtube/connect', { method: 'POST' }),
   ytDisconnect: () => request<{ connected: boolean }>('/api/publish/youtube/disconnect', { method: 'POST' }),

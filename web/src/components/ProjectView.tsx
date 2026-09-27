@@ -106,7 +106,7 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
     return () => unsub.current()
   }, [refresh, listen])
 
-  const recurate = (body: { mode: string; reference_clip_id?: string; steering?: string }) => {
+  const recurate = (body: { mode: string; reference_clip_id?: string; steering?: string; min_duration?: number; max_duration?: number }) => {
     setActionError('')
     return api.recurate(id, body).then(() => { void refresh(); listen() }).catch((e: { message?: string; action?: string }) => setActionError([e.message, e.action].filter(Boolean).join(' ')))
   }
@@ -278,9 +278,17 @@ export function ProjectView({ id, onBack }: { id: string; onBack: () => void }) 
 
       {project.status === 'done' && clips.length === 0 && !project.curation_error && (project.transcript?.words ?? 0) > 0 && (
         <div className="warn" role="status" data-testid="no-clips">
-          <strong>No clips were proposed.</strong> The AI found no self-contained moment of 20–90 seconds in this source.
-          Short sources, or ones that are mostly music or small talk, often have none. Try a longer video, or re-curate with a
-          steering note such as "find the most useful tip".
+          <strong>No clips were proposed.</strong> The initial pass found no self-contained moment. Clipforge makes one automatic 1–2 minute pass when the job cost cap allows.
+          You can try another 1–2 minute pass in this project, or re-curate with a steering note such as "find the most useful tip".
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+            <button className="btn" onClick={() => recurate({ mode: 'fresh', min_duration: 60, max_duration: 120 })}>
+              Try 1–2 minute clips again
+            </button>
+            <input className="field" style={{ flex: 1, minWidth: 200 }} placeholder="Steer this pass: e.g. find the most useful tip" aria-label="Steering for retry" value={steer} onChange={(e) => setSteer(e.target.value)} />
+            <button className="btn" disabled={!steer.trim()} onClick={() => recurate({ mode: 'fresh', min_duration: 60, max_duration: 120, steering: steer })}>
+              Retry with steering
+            </button>
+          </div>
         </div>
       )}
 

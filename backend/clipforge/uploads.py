@@ -117,6 +117,13 @@ class UploadStore:
     def cancel(self, upload_id: str) -> None:
         shutil.rmtree(self._dir(upload_id), ignore_errors=True)
 
+    def completed_path(self, upload_id: str) -> Path:
+        """Return a completed temporary upload for read-only inspection."""
+        meta = self.status(upload_id)
+        if not meta.complete:
+            raise MediaError("The upload is not finished.", "Wait for it to complete.")
+        return self._dir(upload_id) / "data.partial"
+
     def take(self, upload_id: str, dest_dir: Path) -> tuple[Path, str]:
         """Move a finished upload into a project; returns (path, original filename)."""
         meta = self.status(upload_id)

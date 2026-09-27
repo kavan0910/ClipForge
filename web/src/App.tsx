@@ -7,8 +7,9 @@ import { ClipEditor } from './components/ClipEditor'
 import { ProjectsList } from './components/ProjectsList'
 import { RenderQueue } from './components/RenderQueue'
 import { SettingsPage } from './components/SettingsPage'
+import { TikTokCheckTab } from './components/TikTokCheckTab'
 
-type Tab = 'link' | 'upload'
+type Tab = 'link' | 'upload' | 'check'
 
 function useHashRoute(): [string, (h: string) => void] {
   const [hash, setHash] = useState(window.location.hash)
@@ -29,7 +30,8 @@ export default function App() {
   const preview = hash.startsWith('#/preview/') ? hash.slice(10).split('/') : null
 
   function onKey(e: React.KeyboardEvent) {
-    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') setTab((t) => (t === 'link' ? 'upload' : 'link'))
+    if (e.key === 'ArrowRight') setTab((t) => (t === 'link' ? 'upload' : t === 'upload' ? 'check' : 'link'))
+    if (e.key === 'ArrowLeft') setTab((t) => (t === 'check' ? 'upload' : t === 'upload' ? 'link' : 'check'))
   }
 
   const route = hash === '#/queue' ? 'queue' : hash === '#/settings' ? 'settings' : hash.startsWith('#/p/') || hash.startsWith('#/preview/') ? 'project' : 'new'
@@ -68,6 +70,10 @@ export default function App() {
           ) : (
             <>
               <section className="hero">
+                {tab === 'check' ? <>
+                  <h1>Check your <span className="gradient-text">finished TikTok clip</span></h1>
+                  <p>Upload the clip you already made for an advisory quality and content-risk check. No project setup, transcription, or rendering.</p>
+                </> : <>
                 <h1>Turn a long video into <span className="gradient-text">shorts that get watched</span></h1>
                 <p>Paste a link or drop a file. Clipforge finds the best moments, reframes them for vertical, adds captions and hands you ready-to-post clips.</p>
                 <div className="how" aria-label="How it works">
@@ -76,19 +82,25 @@ export default function App() {
                   <div><b>3</b><span><strong>Edit in seconds</strong>Trim by text, captions</span></div>
                   <div><b>4</b><span><strong>Export or post</strong>MP4, NLE, YouTube</span></div>
                 </div>
+                </>}
               </section>
               <div className="card grid gap-4">
                 <div className="tabs" role="tablist" aria-label="Source" onKeyDown={onKey}>
-                  <button role="tab" id="tab-link" className="tab" aria-selected={tab === 'link'} tabIndex={tab === 'link' ? 0 : -1} onClick={() => setTab('link')}>
+                  <button role="tab" id="tab-link" aria-controls="panel-link" className="tab" aria-selected={tab === 'link'} tabIndex={tab === 'link' ? 0 : -1} onClick={() => setTab('link')}>
                     Paste a link
                   </button>
-                  <button role="tab" id="tab-upload" className="tab" aria-selected={tab === 'upload'} tabIndex={tab === 'upload' ? 0 : -1} onClick={() => setTab('upload')}>
+                  <button role="tab" id="tab-upload" aria-controls="panel-upload" className="tab" aria-selected={tab === 'upload'} tabIndex={tab === 'upload' ? 0 : -1} onClick={() => setTab('upload')}>
                     Upload a file
                   </button>
+                  <button role="tab" id="tab-check" aria-controls="panel-check" className="tab" aria-selected={tab === 'check'} tabIndex={tab === 'check' ? 0 : -1} onClick={() => setTab('check')}>
+                    Check finished clip
+                  </button>
                 </div>
-                {tab === 'link' ? <LinkTab onStart={(id) => go(`#/p/${id}`)} /> : <UploadTab onStart={(id) => go(`#/p/${id}`)} />}
+                <div id={tab === 'link' ? 'panel-link' : tab === 'upload' ? 'panel-upload' : 'panel-check'}>
+                  {tab === 'link' ? <LinkTab onStart={(id) => go(`#/p/${id}`)} /> : tab === 'upload' ? <UploadTab onStart={(id) => go(`#/p/${id}`)} /> : <TikTokCheckTab />}
+                </div>
               </div>
-              <ProjectsList onOpen={(id) => go(`#/p/${id}`)} />
+              {tab !== 'check' && <ProjectsList onOpen={(id) => go(`#/p/${id}`)} />}
             </>
           )}
         </div>

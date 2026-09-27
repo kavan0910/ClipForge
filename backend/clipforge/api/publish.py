@@ -15,7 +15,7 @@ from clipforge import edits as clipedits
 from clipforge.config import Settings, get_settings
 from clipforge.curate.run import load_clips
 from clipforge.errors import ClipforgeError
-from clipforge.publish import package
+from clipforge.publish import package, tiktok_preflight
 from clipforge.publish.youtube import PublishError, YouTubeAuth, YouTubePublisher
 from clipforge.store import Project
 
@@ -59,6 +59,17 @@ def register(app: FastAPI, open_project: Callable[[str], Project], settings: Set
             return await run_in_threadpool(work)
         except FileNotFoundError as ex:
             raise HTTPException(409, str(ex)) from None
+
+    @app.get("/api/projects/{project_id}/clips/{clip_id}/tiktok-preflight")
+    async def check_tiktok_preflight(project_id: str, clip_id: str) -> dict[str, Any]:
+        _, _, d = clip_of(project_id, clip_id)
+        out = d / "out.mp4"
+        if not out.is_file():
+            raise HTTPException(409, "Render the clip before running TikTok preflight.")
+        try:
+            return await run_in_threadpool(tiktok_preflight.inspect_video, out)
+        except ValueError as ex:
+            raise HTTPException(422, str(ex)) from None
 
     @app.get("/api/publish/youtube/status")
     async def yt_status() -> dict[str, Any]:

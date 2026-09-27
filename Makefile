@@ -14,11 +14,11 @@ setup:
 
 dev:
 	CLIPFORGE_TOKEN=dev-token uv run uvicorn clipforge.api.app:app --app-dir backend --reload \
-		--host 127.0.0.1 --port 8765 & \
-	cd web && VITE_CLIPFORGE_TOKEN=dev-token npm run dev
+		--host 0.0.0.0 --port 8765 & \
+	cd web && VITE_CLIPFORGE_TOKEN=dev-token npm run dev -- --host 0.0.0.0 --port 5173
 
 start:
-	uv run uvicorn clipforge.api.app:app --app-dir backend --host 127.0.0.1 --port 8765
+	uv run uvicorn clipforge.api.app:app --app-dir backend --host 0.0.0.0 --port 8765
 
 test:
 	uv run pytest -q

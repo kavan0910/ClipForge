@@ -265,14 +265,14 @@ def encode_argv(
             "-color_range", "tv", "-c:a", "aac", "-b:a", "192k", "-t", f"{duration:.6f}", "-movflags", "+faststart", str(out)]  # fmt: skip
 
 
-PREVIEW_W, PREVIEW_H = 360, 640
+PREVIEW_W, PREVIEW_H = 720, 1280
 
 
 def _start_preview(path: Path, audio: Path, fps: float, frames: int) -> subprocess.Popen:
     """Small caption-free proxy of the composed clip: the editor plays it under the live caption preview."""
     argv = ["ffmpeg", "-nostdin", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{PREVIEW_W}x{PREVIEW_H}",
-            "-r", fps_arg(fps), "-i", "-", "-i", str(audio), "-c:v", "libx264", "-preset", "ultrafast", "-crf", "30", "-pix_fmt", "yuv420p",
-            "-c:a", "aac", "-b:a", "64k", "-t", f"{frames / fps:.6f}", "-movflags", "+faststart", str(path.with_suffix(".partial.mp4"))]  # fmt: skip
+            "-r", fps_arg(fps), "-i", "-", "-i", str(audio), "-c:v", "libx264", "-profile:v", "high", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "128k", "-t", f"{frames / fps:.6f}", "-movflags", "+faststart", str(path.with_suffix(".partial.mp4"))]  # fmt: skip
     return subprocess.Popen(
         argv, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True
     )
